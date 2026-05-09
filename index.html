@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<title>Baby Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+body{font-family:'Nunito',sans-serif;direction:rtl;background:#EEF6FD;min-height:100vh;overflow-x:hidden}
+button{font-family:'Nunito',sans-serif}
+input,textarea{font-family:'Nunito',sans-serif}
+::-webkit-scrollbar{display:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ── Theme ──────────────────────────────────────────────────────────────────
+const T={
+  blue:"#2C6BAC",blueMid:"#4A8FD4",blueLight:"#D6E9F8",bluePale:"#EEF6FD",
+  teal:"#3A9E8F",tealLight:"#D4F0EB",sky:"#E3F2FD",cream:"#F7FBFF",
+  green:"#4CAF82",greenLight:"#D8F3E8",lavender:"#E8EEF8",
+  slate:"#3A4A5C",muted:"#8FA3B8",danger:"#E05A5A",
+  bear:"#C8956C",bearDark:"#A0714A",bearLight:"#F0D5C0"
+};
+
+const CAT={
+  feed:  {bg:T.bluePale, accent:T.blue,   border:T.blueLight,label:"האכלה"},
+  diaper:{bg:T.tealLight,accent:T.teal,   border:"#A8DDD5",  label:"חיתול"},
+  sleep: {bg:T.lavender, accent:"#5B6FA6",border:"#C5CEEA",  label:"שינה"},
+  med:   {bg:T.greenLight,accent:T.green, border:"#A8DFC4",  label:"תרופה/ויטמין"},
+  note:  {bg:T.sky,      accent:T.blueMid,border:T.blueLight,label:"הערה"},
+};
+
+const DIAPER_TYPES=[
+  {value:"wet",  label:"רטוב 💧"},
+  {value:"dirty",label:"מלוכלך 💩"},
+  {value:"both", label:"שניהם"},
+];
+
+const FEED_TYPES=[
+  {value:"breast_left", label:"הנקה שמאל"},
+  {value:"breast_right",label:"הנקה ימין"},
+  {value:"formula",     label:"פורמולה 🍼"},
+  {value:"expressed",   label:"חלב מבוטא"},
+  {value:"solids",      label:"מוצקים 🥣"},
+];
+
+const BABY_EMOJIS=["☁️","🌿","🌊","🍃","❄️","🌸","🌾","🌙","⭐","🫧"];
+
+// ── Storage ────────────────────────────────────────────────────────────────
+const store={
+  getBabies:()=>{try{return JSON.parse(localStorage.getItem("bt_babies")||"[]")}catch{return[]}},
+  saveBabies:l=>localStorage.setItem("bt_babies",JSON.stringify(l)),
+  getLogs:id=>{try{return JSON.parse(localStorage.getItem("bt_logs_"+id)||"[]")}catch{return[]}},
+  saveLogs:(id,l)=>localStorage.setItem("bt_logs_"+id,JSON.stringify(l)),
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const fmtTime=ts=>new Date(ts).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"});
+const fmtDate=ts=>new Date(ts).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"});
+const dur=ms=>{const m=Math.floor(ms/60000);return m<60?m+" דק׳":Math.floor(m/60)+":"+String(m%60).padStart(2,"0")+" שע׳"};
+const calcAge=dob=>{
+  if(!dob)return null;
+  const days=Math.floor((Date.now()-new Date(dob))/86400000);
+  if(days<7)return days+" ימים";
+  const w=Math.floor(days/7),rd=days%7;
+  if(w<8)return rd>0?w+" שבועות ו-"+rd+" ימים":w+" שבועות";
+  const mo=Math.floor(days/30.44),rmd=Math.floor(days-mo*30.44);
+  if(mo<24)return rmd>3?mo+" חודשים ו-"+Math.floor(rmd/7)+" שבועות":mo+" חודשים";
+  const y=Math.floor(mo/12),rm=mo%12;
+  return rm>0?y+" שנים ו-"+rm+" חודשים":y+" שנים";
+};
+
+function exportCSV(logs,name){
+  const rows=[["שם","סוג","תת-סוג","מ״ל","משך","שעה","הערה"]];
+  logs.forEach(l=>rows.push([name,CAT[l.type]?.label||l.type,l.subtype||"",l.ml||"",l.amount||(l.durationMs?dur(l.durationMs):""),new Date(l.ts).toLocaleString("he-IL"),l.note||""]));
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(r=>r.map(c=>'"'+c+'"').join(",")).join("\n")],{type:"text/csv;charset=utf-8;"}));
+  a.download=name+".csv";a.click();
+}
+
+function backupAll(babies){
+  const data={version:1,exportedAt:new Date().toISOString(),babies,logs:Object.fromEntries(babies.map(b=>[b.id,store.getLogs(b.id)]))};
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+  a.download="baby-backup-"+new Date().toLocaleDateString("he-IL").replace(/\./g,"-")+".json";a.click();
+}
+
+// ── SVG helpers ────────────────────────────────────────────────────────────
+function svgIcon(path,size=20,color="currentColor"){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}"><path d="${path}"/></svg>`;
+}
+
+const ICONS={
+  bottle:"M6 2l1.5 4H4v2h1l1 12h12l1-12h1V6h-3.5L17 2H6z",
+  diaper:"M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+  moon:"M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z",
+  home:"M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+  chart:"M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z",
+  history:"M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  sun:"M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z",
+  trash:"M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  export:"M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+  import:"M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z",
+  edit:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  play:"M8 5v14l11-7z",
+  pause:"M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  stop:"M6 6h12v12H6z",
+  check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  save:"M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
+  plus:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  swap:"M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z",
+  clock:"M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z",
+  note:"M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z",
+  feed:"M6 2l1.5 4H4v2h1l1 12h12l1-12h1V6h-3.5L17 2H6z",
+  med:"M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z",
+};
+
+function bearSVG(sleeping=false,size=44){
+  const eyes=sleeping
+    ?`<path d="M14 23 Q16 21 18 23" stroke="${T.bearDark}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+       <path d="M26 23 Q28 21 30 23" stroke="${T.bearDark}" stroke-width="1.5" fill="none" stroke-linecap="round"/>`
+    :`<circle cx="16" cy="23" r="3" fill="${T.bearDark}"/>
+      <circle cx="28" cy="23" r="3" fill="${T.bearDark}"/>
+      <circle cx="17" cy="22" r="1" fill="#fff"/>
+      <circle cx="29" cy="22" r="1" fill="#fff"/>`;
+  return `<svg viewBox="0 0 44 46" width="${size}" height="${size+2}" style="display:block">
+    <circle cx="10" cy="10" r="9" fill="${T.bear}"/>
+    <circle cx="34" cy="10" r="9" fill="${T.bear}"/>
+    <circle cx="10" cy="10" r="5" fill="${T.bearLight}"/>
+    <circle cx="34" cy="10" r="5" fill="${T.bearLight}"/>
+    <circle cx="22" cy="26" r="20" fill="${T.bear}"/>
+    <ellipse cx="22" cy="32" rx="10" ry="7" fill="${T.bearLight}"/>
+    ${eyes}
+    <ellipse cx="22" cy="30" rx="3" ry="2" fill="${T.bearDark}"/>
+    <path d="M18 34 Q22 38 26 34" stroke="${T.bearDark}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function cloudsSVG(isNight){
+  if(isNight) return `
+    <rect width="100%" height="200" fill="url(#ngr)"/>
+    <defs><linearGradient id="ngr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0D1B2A"/><stop offset="100%" stop-color="#1B2B3C"/>
+    </linearGradient></defs>
+    <circle cx="40" cy="30" r="1.5" fill="#fff" opacity="0.5"/>
+    <circle cx="100" cy="18" r="1" fill="#fff" opacity="0.5"/>
+    <circle cx="160" cy="40" r="1.5" fill="#fff" opacity="0.6"/>
+    <circle cx="230" cy="22" r="1" fill="#fff" opacity="0.5"/>
+    <circle cx="290" cy="35" r="1.5" fill="#fff" opacity="0.4"/>
+    <circle cx="340" cy="15" r="1" fill="#fff" opacity="0.6"/>
+    <circle cx="370" cy="45" r="1.5" fill="#fff" opacity="0.5"/>
+  `;
+  return `
+    <defs><linearGradient id="dgr" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#BDDFF7"/>
+      <stop offset="60%" stop-color="#D6EEFC"/>
+      <stop offset="100%" stop-color="#EEF6FD"/>
+    </linearGradient></defs>
+    <rect width="100%" height="200" fill="url(#dgr)"/>
+    <g opacity="0.55"><ellipse cx="30" cy="45" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="42" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="46" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="50" rx="30" ry="12" fill="#fff"/></g>
+    <g opacity="0.40" transform="translate(250,18) scale(0.9)"><ellipse cx="30" cy="25" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="22" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="26" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="30" rx="30" ry="12" fill="#fff"/></g>
+    <g opacity="0.30" transform="translate(130,55) scale(0.7)"><ellipse cx="30" cy="25" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="22" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="26" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="30" rx="30" ry="12" fill="#fff"/></g>
+  `;
+}
+
+// ── App State ──────────────────────────────────────────────────────────────
+let state={
+  screen:"selector", // selector | dashboard
+  babies:store.getBabies(),
+  selectedBaby:null,
+  logs:[],
+  tab:"home",
+  modal:null,
+  isNight:null,
+  addingBaby:false,
+  newBabyName:"",
+  newBabyEmoji:"☁️",
+  newBabyDob:"",
+  editDob:false,
+  dobInput:"",
+  // modal state
+  feedType:"breast_left",
+  amount:"",ml:"",
+  diaperType:"wet",
+  medName:"",medDose:"",
+  note:"",
+  sleeping:false,sleepStart:null,elapsed:0,timerMs:null,
+  feedRunning:false,feedStart:null,feedEl:0,
+};
+
+let sleepTimer=null;
+let feedTimer=null;
+let clockTimer=null;
+
+function setState(patch){
+  Object.assign(state,patch);
+  render();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  const app=document.getElementById("app");
+  if(state.screen==="selector") app.innerHTML=renderSelector();
+  else app.innerHTML=renderDashboard();
+  attachEvents();
+}
+
+// ── Selector screen ────────────────────────────────────────────────────────
+function renderSelector(){
+  const night=false;
+  const babies=state.babies;
+  return `
+  <div style="min-height:100vh;background:linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%);padding-bottom:40px;position:relative;overflow:hidden">
+    <svg viewBox="0 0 390 180" style="position:absolute;top:0;left:0;width:100%;height:180px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
+      ${cloudsSVG(false)}
+    </svg>
+    <div style="position:relative;text-align:center;padding:52px 14px 0;margin-bottom:24px">
+      <div style="display:flex;justify-content:center;margin-bottom:8px">${bearSVG(false,52)}</div>
+      <h1 style="font-size:24px;font-weight:900;color:${T.blue};letter-spacing:-0.5px;margin-bottom:4px">Baby Tracker</h1>
+      <p style="color:${T.muted};font-size:13px;font-weight:700">בחר תינוק או הוסף חדש</p>
+    </div>
+    <div style="padding:0 14px">
+      ${babies.map(b=>`
+        <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08);display:flex;align-items:center;gap:12px">
+          <div style="width:48px;height:48px;background:${T.bluePale};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;border:1px solid ${T.blueLight}">${b.emoji}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;font-size:17px;color:${T.slate}">${b.name}</div>
+            <div style="font-size:12px;color:${T.blue};font-weight:700;margin-top:1px">${b.dob?"בן "+calcAge(b.dob):'<span style="color:'+T.muted+'">תאריך לידה לא הוזן</span>'}</div>
+          </div>
+          <button data-action="select-baby" data-id="${b.id}" style="background:${T.blue};color:#fff;border:none;border-radius:6px;padding:10px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">כנס</button>
+          <button data-action="delete-baby" data-id="${b.id}" style="background:#fff;border:1px solid #E0D0D0;border-radius:6px;padding:10px;cursor:pointer;display:flex">
+            ${svgIcon(ICONS.trash,15,T.danger)}
+          </button>
+        </div>
+      `).join("")}
+
+      ${state.addingBaby?`
+        <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08)">
+          <div style="font-weight:800;font-size:15px;color:${T.slate};margin-bottom:14px;display:flex;align-items:center;gap:8px">
+            ${bearSVG(false,32)} תינוק חדש
+          </div>
+          <input id="new-baby-name" value="${state.newBabyName}" placeholder="שם התינוק" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${T.blue};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:10px"/>
+          <label style="display:block;font-size:12px;font-weight:700;color:${T.muted};margin-bottom:5px">תאריך לידה</label>
+          <input id="new-baby-dob" type="date" value="${state.newBabyDob}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:12px"/>
+          <div style="margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;color:${T.muted};margin-bottom:7px">אמוג׳י</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${BABY_EMOJIS.map(e=>`<button data-action="pick-emoji" data-emoji="${e}" style="font-size:22px;background:${state.newBabyEmoji===e?T.bluePale:"#fff"};border:1.5px solid ${state.newBabyEmoji===e?T.blue:"#C8DAE8"};border-radius:6px;padding:7px 10px;cursor:pointer">${e}</button>`).join("")}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button data-action="cancel-add" style="flex:1;background:#fff;color:${T.muted};border:1.5px solid ${T.muted};border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">ביטול</button>
+            <button data-action="confirm-add" style="flex:2;background:${T.blue};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">הוסף ✓</button>
+          </div>
+        </div>
+      `:`
+        <button data-action="start-add" style="width:100%;padding:13px;background:rgba(255,255,255,0.8);border:1.5px dashed ${T.blueMid};border-radius:10px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;color:${T.blue};margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+          ${svgIcon(ICONS.plus,16,T.blue)} הוסף תינוק חדש
+        </button>
+      `}
+
+      <div style="background:#fff;border-radius:10px;padding:16px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08)">
+        <div style="font-weight:800;font-size:13px;color:${T.slate};margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          ${svgIcon(ICONS.save,14,T.blue)} גיבוי ושחזור
+        </div>
+        <div style="font-size:11px;color:${T.muted};margin-bottom:10px;line-height:1.6">מומלץ לגבות אחת לכמה ימים — שומר את כל הנתונים.</div>
+        <div style="display:flex;gap:8px">
+          <button data-action="backup" style="flex:1;background:${T.green};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            ${svgIcon(ICONS.export,15,"#fff")} ייצוא
+          </button>
+          <button data-action="restore-click" style="flex:1;background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+            ${svgIcon(ICONS.import,15,"#fff")} שחזור
+          </button>
+        </div>
+        <input id="restore-file" type="file" accept=".json" style="display:none"/>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+function renderDashboard(){
+  const baby=state.selectedBaby;
+  const logs=state.logs;
+  const autoNight=new Date().getHours()>=21||new Date().getHours()<6;
+  const isNight=state.isNight!==null?state.isNight:autoNight;
+  const C=(extra="")=>isNight
+    ?`background:rgba(255,255,255,0.07);border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.1);${extra}`
+    :`background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08);${extra}`;
+  const tp=isNight?"#EEF6FD":T.slate;
+  const ts=isNight?"rgba(200,218,232,0.55)":T.muted;
+  const bg=isNight?"linear-gradient(180deg,#0D1B2A 0%,#1B2B3C 100%)":`linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%)`;
+
+  const todayStart=new Date();todayStart.setHours(0,0,0,0);
+  const ystStart=new Date(todayStart);ystStart.setDate(ystStart.getDate()-1);
+  const todayLogs=logs.filter(l=>l.ts>=todayStart.getTime());
+  const ystLogs=logs.filter(l=>l.ts>=ystStart.getTime()&&l.ts<todayStart.getTime());
+  const feeds=todayLogs.filter(l=>l.type==="feed");
+  const diapers=todayLogs.filter(l=>l.type==="diaper");
+  const sleeps=todayLogs.filter(l=>l.type==="sleep");
+  const totalMl=feeds.reduce((s,l)=>s+(Number(l.ml)||0),0);
+  const totalSlMs=sleeps.reduce((s,l)=>s+(l.durationMs||0),0);
+  const age=calcAge(baby.dob);
+
+  const catIcons={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
+
+  let tabContent="";
+  if(state.tab==="home"){
+    tabContent=`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        ${[
+          {icon:ICONS.bottle,val:feeds.length,sub:totalMl?totalMl+" מ״ל":"האכלות",color:T.blue,bg:T.bluePale,border:T.blueLight},
+          {icon:ICONS.diaper,val:diapers.length,sub:"חיתולים",color:T.teal,bg:T.tealLight,border:"#A8DDD5"},
+          {icon:ICONS.moon,val:totalSlMs?dur(totalSlMs):sleeps.length,sub:"שינה",color:"#5B6FA6",bg:T.lavender,border:"#C5CEEA"},
+        ].map(s=>`
+          <div style="${C("margin-bottom:0;padding:12px 6px;")}text-align:center">
+            <div style="display:flex;justify-content:center;margin-bottom:5px">
+              <div style="background:${s.bg};border-radius:6px;padding:6px;border:1px solid ${s.border}">${svgIcon(s.icon,16,s.color)}</div>
+            </div>
+            <div style="font-size:18px;font-weight:900;color:${s.color}">${s.val}</div>
+            <div style="font-size:10px;color:${ts};font-weight:700">${s.sub}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div style="${C()}">
+        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:10px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${Object.entries(CAT).map(([type,c])=>`
+            <button data-action="open-modal" data-type="${type}" style="background:${isNight?"rgba(255,255,255,0.05)":c.bg};border:1px solid ${isNight?"rgba(255,255,255,0.08)":c.border};border-radius:8px;padding:12px 10px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:9px">
+              <div style="background:${isNight?"rgba(255,255,255,0.1)":"#fff"};border-radius:6px;padding:6px;border:1px solid ${isNight?"rgba(255,255,255,0.08)":c.border};flex-shrink:0">
+                ${svgIcon(catIcons[type],16,c.accent)}
+              </div>
+              <span style="font-weight:700;font-size:13px;color:${isNight?"rgba(238,246,253,0.9)":T.slate}">${c.label}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+
+      ${todayLogs.length>0?`
+        <div style="${C()}">
+          <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.clock,12,ts)} היום</div>
+          ${todayLogs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
+        </div>
+      `:""}
+      ${ystLogs.length>0?`
+        <div style="${C()}">
+          <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.history,12,ts)} אתמול</div>
+          ${ystLogs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
+        </div>
+      `:""}
+      ${todayLogs.length===0&&ystLogs.length===0?`
+        <div style="text-align:center;padding:32px 0;color:${ts}">
+          <div style="display:flex;justify-content:center;margin-bottom:10px;opacity:0.35">${bearSVG(false,46)}</div>
+          <div style="font-weight:700;font-size:14px;color:${tp}">עדיין לא רשמת היום</div>
+          <div style="font-size:12px;margin-top:3px">לחץ על אחד הכפתורים למעלה</div>
+        </div>
+      `:""}
+    `;
+  } else if(state.tab==="charts"){
+    tabContent=renderCharts(logs,isNight,ts,C);
+  } else {
+    tabContent=`
+      <div style="${C()}">
+        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.history,12,ts)} כל הרשומות של ${baby.name}</div>
+        ${logs.length===0?`<div style="color:${ts};text-align:center;padding:16px;font-size:13px">אין רשומות עדיין</div>`:""}
+        ${logs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
+      </div>
+      <button data-action="export-csv" style="background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
+        ${svgIcon(ICONS.export,15,"#fff")} ייצוא ל-CSV
+      </button>
+      ${logs.length>0?`
+        <button data-action="clear-logs" style="background:#fff;color:${T.danger};border:1.5px solid ${T.danger};border-radius:6px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
+          ${svgIcon(ICONS.trash,15,T.danger)} מחק את כל הנתונים
+        </button>
+      `:""}
+    `;
+  }
+
+  const modalHTML=state.modal?renderModal(state.modal,isNight):"";
+
+  return `
+  <div style="min-height:100vh;background:${bg};padding-bottom:80px;position:relative;overflow-x:hidden">
+    <svg viewBox="0 0 390 200" style="position:absolute;top:0;left:0;width:100%;height:200px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
+      ${cloudsSVG(isNight)}
+    </svg>
+    <div style="position:relative;padding:50px 14px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <button data-action="go-back" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 12px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${tp};display:flex;align-items:center;gap:6px">
+          ${svgIcon(ICONS.swap,14,isNight?"#8AAAC8":T.blue)} החלף
+        </button>
+        <button data-action="toggle-night" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:6px;color:${tp};font-family:inherit;font-weight:700;font-size:12px">
+          ${svgIcon(isNight?ICONS.sun:ICONS.moon,14,isNight?"#FFD166":T.blue)}${isNight?"יום":"לילה"}
+        </button>
+      </div>
+
+      <div style="${C("margin-bottom:14px;")}">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="flex-shrink:0;width:58px;height:58px;background:${isNight?"rgba(74,143,212,0.15)":T.bluePale};border-radius:8px;border:1px solid ${isNight?"rgba(74,143,212,0.25)":T.blueLight};display:flex;align-items:center;justify-content:center">
+            ${bearSVG(false,44)}
+          </div>
+          <div style="flex:1">
+            <div style="font-weight:900;font-size:19px;color:${tp};line-height:1.1">${baby.name}</div>
+            ${age?`<div style="font-size:13px;color:${T.blue};font-weight:700;margin-top:3px">בן ${age}</div>`:""}
+            ${state.editDob?`
+              <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+                <input id="dob-edit-input" type="date" value="${state.dobInput}" style="padding:6px 10px;border-radius:6px;border:1.5px solid ${T.blue};font-size:12px;font-family:inherit;flex:1"/>
+                <button data-action="save-dob" style="background:${T.blue};color:#fff;border:none;border-radius:6px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✓</button>
+                <button data-action="cancel-dob" style="background:#fff;color:${T.muted};border:1.5px solid ${T.muted};border-radius:6px;padding:6px 8px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✕</button>
+              </div>
+            `:`
+              <button data-action="edit-dob" style="background:none;border:none;padding:0;margin-top:3px;cursor:pointer;display:flex;align-items:center;gap:4px;color:${ts};font-size:11px;font-family:inherit">
+                ${svgIcon(ICONS.edit,11,ts)}${baby.dob?new Date(baby.dob).toLocaleDateString("he-IL"):"הוסף תאריך לידה"}
+              </button>
+            `}
+          </div>
+        </div>
+        <div style="font-size:11px;color:${ts};margin-top:10px;padding-top:10px;border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":"#E4EFF8"}">${fmtDate(Date.now())}</div>
+      </div>
+    </div>
+
+    <div style="padding:0 14px">${tabContent}</div>
+
+    <div style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"#0D1B2A":"#fff"};border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":T.blueLight};display:flex;justify-content:space-around;padding:8px 0 18px;z-index:50">
+      ${[
+        {id:"home",icon:ICONS.home,label:"בית"},
+        {id:"charts",icon:ICONS.chart,label:"גרפים"},
+        {id:"history",icon:ICONS.history,label:"היסטוריה"},
+      ].map(t=>`
+        <button data-action="set-tab" data-tab="${t.id}" style="background:none;border:none;cursor:pointer;font-family:inherit;text-align:center;padding:4px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:${state.tab===t.id?1:0.32}">
+          ${svgIcon(t.icon,21,state.tab===t.id?T.blue:tp)}
+          <div style="font-size:10px;font-weight:700;color:${tp}">${t.label}</div>
+        </button>
+      `).join("")}
+    </div>
+    ${modalHTML}
+  </div>`;
+}
+
+function renderLogItem(l,ts,catIcons){
+  const c=CAT[l.type];
+  const feedLabel=FEED_TYPES.find(f=>f.value===l.subtype)?.label;
+  const diaperLabel=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label;
+  let detail="";
+  if(feedLabel) detail+=feedLabel;
+  if(diaperLabel) detail+=diaperLabel;
+  if(l.medName) detail+=l.medName+(l.medDose?" · "+l.medDose:"");
+  if(l.ml) detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
+  else if(l.amount) detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
+  if(l.durationMs>0) detail+=" · "+dur(l.durationMs);
+  if(l.note) detail+=" · "+l.note;
+  return `
+    <div style="display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:8px;background:${c.bg};margin-bottom:6px;border:1px solid ${c.border}">
+      <div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px;border:1px solid ${c.border}">${svgIcon(catIcons[l.type]||ICONS.note,16,c.accent)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:12px;color:${c.accent}">${c.label}</div>
+        <div style="font-size:11px;color:${T.slate};margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${detail}</div>
+      </div>
+      <div style="text-align:center;flex-shrink:0;min-width:48px">
+        <div style="font-size:12px;font-weight:800;color:${c.accent}">${fmtTime(l.ts)}</div>
+        <div style="font-size:9px;color:${T.muted}">${new Date(l.ts).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"})}</div>
+      </div>
+      <button data-action="delete-log" data-id="${l.id}" style="background:rgba(255,255,255,0.8);border:1px solid ${c.border};border-radius:6px;width:28px;height:28px;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:${T.muted}">✕</button>
+    </div>`;
+}
+
+function renderCharts(logs,isNight,ts,C){
+  const last7=Array.from({length:7},(_,i)=>{
+    const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-6+i);
+    const n=new Date(d);n.setDate(n.getDate()+1);
+    const dl=logs.filter(l=>l.ts>=d.getTime()&&l.ts<n.getTime());
+    return{
+      day:d.toLocaleDateString("he-IL",{weekday:"short"}),
+      ml:dl.filter(l=>l.type==="feed").reduce((s,l)=>s+(Number(l.ml)||0),0),
+      hrs:+(dl.filter(l=>l.type==="sleep").reduce((s,l)=>s+(l.durationMs||0),0)/3600000).toFixed(1),
+      diapers:dl.filter(l=>l.type==="diaper").length
+    };
+  });
+  const charts=[
+    {key:"ml",label:'מ״ל האכלה',unit:'מ"ל',color:T.blue,type:"bar",icon:ICONS.bottle},
+    {key:"hrs",label:"שעות שינה",unit:"שע׳",color:"#5B6FA6",type:"line",icon:ICONS.moon},
+    {key:"diapers",label:"חיתולים",unit:"",color:T.teal,type:"bar",icon:ICONS.diaper},
+  ];
+  return charts.map(ch=>{
+    const data=last7.map(d=>({day:d.day,val:d[ch.key]}));
+    const max=Math.max(...data.map(d=>d.val),1);
+    const W=300,H=88,gap=4;
+    const bw=(W-gap*(data.length+1))/data.length;
+    let chartSvg="";
+    if(ch.type==="bar"){
+      chartSvg=data.map((d,i)=>{
+        const bh=Math.max((d.val/max)*H,d.val>0?3:0);
+        const x=gap+i*(bw+gap),y=H-bh;
+        return `<rect x="${x}" y="${d.val>0?y:H}" width="${bw}" height="${d.val>0?bh:2}" rx="3" fill="${d.val>0?ch.color:"#E0EDF7"}"/>
+          ${d.val>0?`<text x="${x+bw/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${d.val}</text>`:""}
+          <text x="${x+bw/2}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${d.day}</text>`;
+      }).join("");
+    } else {
+      const padX=14;
+      const pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:H-(d.val/max)*H,val:d.val,day:d.day}));
+      const path=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+      chartSvg=`<path d="${path}" fill="none" stroke="${ch.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      chartSvg+=pts.map((p,i)=>`
+        <circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>
+        ${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}
+        <text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>
+      `).join("");
+    }
+    return `
+      <div style="${C()}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            ${svgIcon(ch.icon,14,isNight?"rgba(255,255,255,0.5)":T.muted)}
+            <span style="font-size:12px;font-weight:700;color:${ts}">${ch.label} — 7 ימים</span>
+          </div>
+          <span style="font-size:13px;font-weight:800;color:${ch.color}">${last7[6][ch.key]} ${ch.unit} היום</span>
+        </div>
+        <svg viewBox="0 0 ${W} ${H+24}" style="width:100%">${chartSvg}</svg>
+      </div>`;
+  }).join("");
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function renderModal(type,isNight){
+  const c=CAT[type];
+  const catIcon={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
+  let inner="";
+  if(type==="feed"){
+    inner=`
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        ${FEED_TYPES.map(f=>`
+          <button data-action="set-feed-type" data-val="${f.value}" style="padding:10px 13px;border-radius:6px;border:1.5px solid ${state.feedType===f.value?c.accent:"#C8DAE8"};background:${state.feedType===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${state.feedType===f.value?c.accent:T.slate}">${f.label}</button>
+        `).join("")}
+      </div>
+      ${state.feedType.includes("breast")?`
+        <div style="background:${c.bg};border-radius:8px;padding:16px;text-align:center;margin-bottom:14px;border:1px solid ${c.accent}30">
+          <div style="font-size:44px;font-weight:900;color:${c.accent};letter-spacing:4px;margin-bottom:10px;font-family:monospace">${fmtFeedTimer(state.feedEl)}</div>
+          <div style="display:flex;gap:8px;justify-content:center">
+            ${!state.feedRunning&&!state.feedStart?`<button data-action="feed-timer-start" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:9px 22px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">▶ התחל</button>`:""}
+            ${state.feedRunning?`<button data-action="feed-timer-pause" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:9px 22px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">⏸ השהה</button>`:""}
+            ${!state.feedRunning&&state.feedStart?`
+              <button data-action="feed-timer-resume" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">▶ המשך</button>
+              <button data-action="feed-timer-done" style="background:#fff;color:${c.accent};border:1.5px solid ${c.accent};border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">✓ סיים</button>
+            `:""}
+          </div>
+        </div>
+      `:""}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div>
+          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${state.feedType.includes("breast")?"משך (דק׳)":"כמות (מ״ל)"}</label>
+          <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="${state.feedType.includes("breast")?"15":"120"}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
+          <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="80" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+        </div>
+      </div>
+      <div style="background:${c.bg};border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:${c.accent};font-weight:700;border:1px solid ${c.border};display:flex;align-items:center;gap:6px">
+        ${svgIcon(ICONS.clock,13,c.accent)} שעת האכלה: ${new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}
+      </div>`;
+  } else if(type==="diaper"){
+    inner=`
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        ${DIAPER_TYPES.map(d=>`
+          <button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center">${d.label}</button>
+        `).join("")}
+      </div>`;
+  } else if(type==="sleep"){
+    inner=`
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="display:flex;justify-content:center;margin-bottom:14px">${bearSVG(state.sleeping||!!state.sleepStart,64)}</div>
+        ${state.sleeping?`
+          <div style="font-size:48px;font-weight:900;color:${c.accent};letter-spacing:3px;margin-bottom:14px;font-family:monospace">
+            ${String(Math.floor(state.elapsed/3600000)).padStart(2,"0")}:${String(Math.floor((state.elapsed%3600000)/60000)).padStart(2,"0")}:${String(Math.floor((state.elapsed%60000)/1000)).padStart(2,"0")}
+          </div>
+          <button data-action="sleep-stop" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:13px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%">⏹ עצור שינה</button>
+        `:state.sleepStart?`
+          <div style="font-size:15px;color:${T.muted};font-weight:700;padding:12px 0">✓ שינה הוקלטה: ${dur(state.elapsed)}</div>
+        `:`
+          <button data-action="sleep-start" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%">▶ התחל להקליט שינה</button>
+        `}
+      </div>`;
+  } else if(type==="med"){
+    inner=`
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">שם התרופה / ויטמין</label>
+        <input id="modal-med-name" value="${state.medName}" placeholder="למשל: ויטמין D, נורופן" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:10px"/>
+        <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מינון</label>
+        <input id="modal-med-dose" value="${state.medDose}" placeholder='למשל: 1 מ"ל' style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+      </div>`;
+  }
+
+  return `
+    <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:#F7FBFF;border-radius:14px 14px 0 0;width:100%;max-width:500px;direction:rtl;font-family:'Nunito',sans-serif;max-height:92vh;overflow-y:auto">
+        <div style="background:${c.bg};border-radius:14px 14px 0 0;padding:16px 18px 14px;border-bottom:1px solid ${c.border}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="background:#fff;border-radius:6px;padding:7px;border:1px solid ${c.border}">${svgIcon(catIcon[type],20,c.accent)}</div>
+              <span style="font-size:17px;font-weight:800;color:${c.accent}">${c.label}</span>
+            </div>
+            <button data-action="close-modal" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:32px;height:32px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:${T.muted}">✕</button>
+          </div>
+        </div>
+        <div style="padding:18px 18px 40px">
+          ${inner}
+          <textarea id="modal-note" placeholder="הערה (אופציונלי)..." style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;height:68px;resize:none;margin-bottom:14px">${state.note}</textarea>
+          <button data-action="save-log" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:15px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
+            ${svgIcon(ICONS.save,16,"#fff")} שמור
+          </button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function fmtFeedTimer(ms){
+  const s=Math.floor(ms/1000);
+  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+}
+
+// ── Events ─────────────────────────────────────────────────────────────────
+function attachEvents(){
+  document.querySelectorAll("[data-action]").forEach(el=>{
+    el.addEventListener("click",handleAction);
+  });
+  // live input sync
+  const nameInput=document.getElementById("new-baby-name");
+  if(nameInput) nameInput.addEventListener("input",e=>state.newBabyName=e.target.value);
+  const dobInput=document.getElementById("new-baby-dob");
+  if(dobInput) dobInput.addEventListener("input",e=>state.newBabyDob=e.target.value);
+  const dobEdit=document.getElementById("dob-edit-input");
+  if(dobEdit) dobEdit.addEventListener("input",e=>state.dobInput=e.target.value);
+  const restoreFile=document.getElementById("restore-file");
+  if(restoreFile) restoreFile.addEventListener("change",handleRestore);
+}
+
+function handleAction(e){
+  const el=e.currentTarget;
+  const action=el.dataset.action;
+
+  if(action==="select-baby"){
+    const baby=state.babies.find(b=>b.id===el.dataset.id);
+    if(!baby) return;
+    setState({screen:"dashboard",selectedBaby:baby,logs:store.getLogs(baby.id),tab:"home",modal:null,isNight:null,dobInput:baby.dob||""});
+  }
+  else if(action==="delete-baby"){
+    if(!confirm("למחוק תינוק זה?")) return;
+    const babies=state.babies.filter(b=>b.id!==el.dataset.id);
+    store.saveBabies(babies);
+    setState({babies});
+  }
+  else if(action==="start-add") setState({addingBaby:true});
+  else if(action==="cancel-add") setState({addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:""});
+  else if(action==="pick-emoji") setState({newBabyEmoji:el.dataset.emoji});
+  else if(action==="confirm-add"){
+    if(!state.newBabyName.trim()) return;
+    const baby={id:Date.now().toString(),name:state.newBabyName.trim(),emoji:state.newBabyEmoji,dob:state.newBabyDob,createdAt:Date.now()};
+    const babies=[...state.babies,baby];
+    store.saveBabies(babies);
+    setState({babies,screen:"dashboard",selectedBaby:baby,logs:[],tab:"home",modal:null,isNight:null,addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:"",dobInput:baby.dob||""});
+  }
+  else if(action==="backup") backupAll(state.babies);
+  else if(action==="restore-click") document.getElementById("restore-file").click();
+  else if(action==="go-back") setState({screen:"selector",selectedBaby:null,logs:[],modal:null});
+  else if(action==="toggle-night"){
+    const autoNight=new Date().getHours()>=21||new Date().getHours()<6;
+    const cur=state.isNight!==null?state.isNight:autoNight;
+    setState({isNight:!cur});
+  }
+  else if(action==="set-tab") setState({tab:el.dataset.tab});
+  else if(action==="open-modal"){
+    clearInterval(sleepTimer);clearInterval(feedTimer);
+    setState({modal:el.dataset.type,feedType:"breast_left",amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
+  }
+  else if(action==="close-modal"){clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});}
+  else if(action==="save-log") saveLog();
+  else if(action==="delete-log"){
+    const logs=state.logs.filter(l=>String(l.id)!==el.dataset.id);
+    store.saveLogs(state.selectedBaby.id,logs);
+    setState({logs});
+  }
+  else if(action==="export-csv") exportCSV(state.logs,state.selectedBaby.name);
+  else if(action==="clear-logs"){
+    if(!confirm("למחוק את כל הנתונים?")) return;
+    store.saveLogs(state.selectedBaby.id,[]);
+    setState({logs:[]});
+  }
+  else if(action==="edit-dob") setState({editDob:true,dobInput:state.selectedBaby.dob||""});
+  else if(action==="cancel-dob") setState({editDob:false});
+  else if(action==="save-dob"){
+    const baby={...state.selectedBaby,dob:state.dobInput};
+    const babies=state.babies.map(b=>b.id===baby.id?baby:b);
+    store.saveBabies(babies);
+    setState({selectedBaby:baby,babies,editDob:false});
+  }
+  else if(action==="set-feed-type") setState({feedType:el.dataset.val,feedRunning:false,feedStart:null,feedEl:0,timerMs:null});
+  else if(action==="feed-timer-start"){
+    const s=Date.now();
+    state.feedStart=s;state.feedRunning=true;
+    clearInterval(feedTimer);
+    feedTimer=setInterval(()=>setState({feedEl:Date.now()-state.feedStart}),1000);
+    setState({feedRunning:true});
+  }
+  else if(action==="feed-timer-pause"){clearInterval(feedTimer);setState({feedRunning:false});}
+  else if(action==="feed-timer-resume"){
+    const offset=state.feedEl;const now=Date.now();
+    state.feedStart=now-offset;
+    clearInterval(feedTimer);
+    feedTimer=setInterval(()=>setState({feedEl:Date.now()-state.feedStart}),1000);
+    setState({feedRunning:true});
+  }
+  else if(action==="feed-timer-done"){
+    clearInterval(feedTimer);
+    const ms=state.feedEl;
+    setState({feedRunning:false,timerMs:ms,amount:String(Math.round(ms/60000))});
+  }
+  else if(action==="sleep-start"){
+    const s=Date.now();
+    state.sleepStart=s;
+    clearInterval(sleepTimer);
+    sleepTimer=setInterval(()=>setState({elapsed:Date.now()-state.sleepStart}),1000);
+    setState({sleeping:true});
+  }
+  else if(action==="sleep-stop"){
+    clearInterval(sleepTimer);
+    setState({sleeping:false});
+  }
+  else if(action==="set-diaper-type") setState({diaperType:el.dataset.val});
+}
+
+function saveLog(){
+  // read inputs
+  const amtEl=document.getElementById("modal-amount");
+  const mlEl=document.getElementById("modal-ml");
+  const noteEl=document.getElementById("modal-note");
+  const medNameEl=document.getElementById("modal-med-name");
+  const medDoseEl=document.getElementById("modal-med-dose");
+  if(amtEl) state.amount=amtEl.value;
+  if(mlEl) state.ml=mlEl.value;
+  if(noteEl) state.note=noteEl.value;
+  if(medNameEl) state.medName=medNameEl.value;
+  if(medDoseEl) state.medDose=medDoseEl.value;
+
+  const base={type:state.modal,ts:Date.now(),note:state.note,id:Date.now()+Math.random()};
+  let log;
+  if(state.modal==="feed") log={...base,subtype:state.feedType,amount:state.amount?Number(state.amount):null,ml:state.ml?Number(state.ml):null,durationMs:state.timerMs||null};
+  else if(state.modal==="diaper") log={...base,subtype:state.diaperType};
+  else if(state.modal==="sleep") log={...base,subtype:"tracked",durationMs:state.sleepStart?Date.now()-state.sleepStart:0};
+  else if(state.modal==="med") log={...base,medName:state.medName,medDose:state.medDose};
+  else log=base;
+
+  clearInterval(sleepTimer);clearInterval(feedTimer);
+  const logs=[log,...state.logs];
+  store.saveLogs(state.selectedBaby.id,logs);
+  setState({logs,modal:null,sleeping:false,sleepStart:null,elapsed:0,feedRunning:false,feedStart:null,feedEl:0});
+}
+
+function handleRestore(e){
+  const file=e.target.files[0];
+  if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.babies||!d.logs) return alert("קובץ לא תקין");
+      store.saveBabies(d.babies);
+      Object.entries(d.logs).forEach(([id,l])=>store.saveLogs(id,l));
+      setState({babies:d.babies});
+    }catch{alert("שגיאה בקריאת הקובץ");}
+  };
+  r.readAsText(file);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
