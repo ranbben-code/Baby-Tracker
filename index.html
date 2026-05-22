@@ -693,11 +693,11 @@ function renderEditModal(l){
         return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
           <div>
             <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות (מ״ל)"}</label>
-            <input id="edit-amount-0" type="number" inputmode="numeric" value="${editL.amount||""}" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            <input id="edit-amount-0" type="number" inputmode="numeric" value="${editL.amount||""}" placeholder="0" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
           </div>
           <div>
             <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
-            <input id="edit-ml-0" type="number" inputmode="numeric" value="${editL.ml||""}" placeholder="80" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            <input id="edit-ml-0" type="number" inputmode="numeric" value="${editL.ml||""}" placeholder="0" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
           </div>
         </div>`;
       })():""}
@@ -710,11 +710,11 @@ function renderEditModal(l){
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div>
               <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות"}</label>
-              <input id="edit-amount-${i}" type="number" inputmode="numeric" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              <input id="edit-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
             </div>
             <div>
               <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">מ״ל</label>
-              <input id="edit-ml-${i}" type="number" inputmode="numeric" value="${savedMl}" placeholder="80" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              <input id="edit-ml-${i}" type="number" inputmode="numeric" value="${savedMl}" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
             </div>
           </div>
         </div>`;
@@ -881,11 +881,11 @@ function renderModal(type,isNight){
           return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
             <div>
               <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות (מ״ל)"}</label>
-              <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
             </div>
             <div>
               <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
-              <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="80" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
             </div>
           </div>`;
         }
@@ -898,11 +898,11 @@ function renderModal(type,isNight){
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div>
                 <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות"}</label>
-                <input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+                <input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
               </div>
               <div>
                 <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">מ״ל</label>
-                <input id="modal-ml-${i}" type="number" inputmode="numeric" placeholder="80" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+                <input id="modal-ml-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
               </div>
             </div>
           </div>`;
