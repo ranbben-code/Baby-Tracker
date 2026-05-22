@@ -294,7 +294,7 @@ let state={
   addingBaby:false,
   newBabyName:"",newBabyEmoji:"☁️",newBabyDob:"",
   editDob:false,dobInput:"",
-  feedType:["breast_left"],amount:"",ml:"",
+  feedType:[],amount:"",ml:"",
   diaperType:"wet",
   medName:"",medDose:"",note:"",
   sleeping:false,sleepStart:null,elapsed:0,timerMs:null,
@@ -457,7 +457,13 @@ function renderDashboard(){
       </div>
 
       <div style="${C()}">
-        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:10px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:${ts};display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
+          <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            Google Sheets
+          </button>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           ${Object.entries(CAT).map(([type,c])=>`
             <button data-action="open-modal" data-type="${type}" style="background:${isNight?"rgba(255,255,255,0.05)":c.bg};border:1px solid ${isNight?"rgba(255,255,255,0.08)":c.border};border-radius:8px;padding:12px 10px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:9px">
@@ -757,16 +763,41 @@ function renderModal(type,isNight){
               <button data-action="feed-timer-done" style="background:#fff;color:${c.accent};border:1.5px solid ${c.accent};border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">✓ סיים</button>`:""}
           </div>
         </div>`:""}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <div>
-          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${(Array.isArray(state.feedType)?state.feedType:[state.feedType]).some(t=>t&&t.includes("breast"))?"משך (דק׳)":"כמות (מ״ל)"}</label>
-          <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="${(Array.isArray(state.feedType)?state.feedType:[state.feedType]).some(t=>t&&t.includes("breast"))?"15":"120"}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-        </div>
-        <div>
-          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
-          <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="80" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-        </div>
-      </div>
+      ${(()=>{
+        const types=Array.isArray(state.feedType)?state.feedType:(state.feedType?[state.feedType]:[]);
+        if(types.length===0) return "";
+        if(types.length===1){
+          const isBreast=types[0].includes("breast");
+          return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div>
+              <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות (מ״ל)"}</label>
+              <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
+              <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="80" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            </div>
+          </div>`;
+        }
+        // multiple types — field per type
+        return types.map((t,i)=>{
+          const ft=FEED_TYPES.find(f=>f.value===t);
+          const isBreast=t.includes("breast");
+          return`<div style="background:${c.bg};border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid ${c.border}">
+            <div style="font-size:12px;font-weight:800;color:${c.accent};margin-bottom:8px">${ft?.label||t}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות"}</label>
+                <input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              </div>
+              <div>
+                <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">מ״ל</label>
+                <input id="modal-ml-${i}" type="number" inputmode="numeric" placeholder="80" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+              </div>
+            </div>
+          </div>`;
+        }).join("");
+      })()}
       <div style="background:${c.bg};border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:${c.accent};font-weight:700;border:1px solid ${c.border};display:flex;align-items:center;gap:6px">
         ${svgIcon(ICONS.clock,13,c.accent)} שעת האכלה: ${new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}
       </div>`;
@@ -920,7 +951,7 @@ function handleAction(e,el){
   else if(action==="set-tab")setState({tab:el.dataset.tab});
   else if(action==="open-modal"){
     clearInterval(sleepTimer);clearInterval(feedTimer);
-    setState({modal:el.dataset.type,feedType:["breast_left"],amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
+    setState({modal:el.dataset.type,feedType:[],amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
   }
   else if(action==="close-modal"){
     btConfirm("לסגור ולבטל את הרישום?","סגור",()=>{
@@ -959,7 +990,7 @@ function handleAction(e,el){
     const val=el.dataset.val;
     const cur=Array.isArray(state.feedType)?state.feedType:[state.feedType].filter(Boolean);
     const newTypes=cur.includes(val)?cur.filter(t=>t!==val):[...cur,val];
-    setState({feedType:newTypes.length?newTypes:["breast_left"],feedRunning:false,feedStart:null,feedEl:0,timerMs:null});
+    setState({feedType:newTypes,feedRunning:false,feedStart:null,feedEl:0,timerMs:null});
   }
   else if(action==="feed-timer-start"){
     const s=Date.now();state.feedStart=s;state.feedRunning=true;
@@ -1068,8 +1099,29 @@ function saveLog(){
   const base={type:state.modal,ts:Date.now(),note:state.note,id};
   let log;
   if(state.modal==="feed"){
-    const ft=Array.isArray(state.feedType)?state.feedType.join(","):state.feedType;
-    log={...base,subtype:ft,amount:state.amount?Number(state.amount):null,ml:state.ml?Number(state.ml):null,durationMs:state.timerMs||null};
+    const types=Array.isArray(state.feedType)?state.feedType:(state.feedType?[state.feedType]:[]);
+    const ft=types.join(",");
+    let amount=null,ml=null,mlByType={};
+    if(types.length<=1){
+      const amtEl=document.getElementById("modal-amount");
+      const mlEl=document.getElementById("modal-ml");
+      if(amtEl)state.amount=amtEl.value;
+      if(mlEl)state.ml=mlEl.value;
+      amount=state.amount?Number(state.amount):null;
+      ml=state.ml?Number(state.ml):null;
+    } else {
+      // multiple types — collect per index
+      types.forEach((t,i)=>{
+        const amtEl=document.getElementById("modal-amount-"+i);
+        const mlEl=document.getElementById("modal-ml-"+i);
+        const a=amtEl?.value?Number(amtEl.value):null;
+        const m=mlEl?.value?Number(mlEl.value):null;
+        if(m) mlByType[t]=m;
+        if(a&&!amount) amount=a;
+      });
+      ml=Object.values(mlByType).reduce((s,v)=>s+v,0)||null;
+    }
+    log={...base,subtype:ft,amount,ml,mlByType:Object.keys(mlByType).length?mlByType:null,durationMs:state.timerMs||null};
   }
   else if(state.modal==="diaper")log={...base,subtype:state.diaperType};
   else if(state.modal==="sleep"){
