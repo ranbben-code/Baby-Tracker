@@ -781,6 +781,7 @@ function handleAction(e,el){
     setState({sleeping:true});
   }
   else if(action==="sleep-stop"){clearInterval(sleepTimer);setState({sleeping:false});}
+  else if(action==="set-diaper-type")setState({diaperType:el.dataset.val});
   else if(action==="edit-time")setState({editingTimeId:el.dataset.id});
   else if(action==="cancel-time")setState({editingTimeId:null});
   else if(action==="save-time"){
