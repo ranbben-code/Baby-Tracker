@@ -1145,7 +1145,7 @@ function handleAction(e,el){
     const lid=el.dataset.id;
     const orig=state.logs.find(l=>String(l.id)===lid);
     if(!orig)return;
-    // read all editable fields
+    const editL=state.editingLog||orig;
     const tsEl=document.getElementById("edit-ts");
     const noteEl=document.getElementById("edit-note");
     const newTs=tsEl?new Date(tsEl.value).getTime():orig.ts;
@@ -1174,7 +1174,7 @@ function handleAction(e,el){
       updated.ml=ml;
       updated.mlByType=Object.keys(mlByType).length?mlByType:null;
     } else if(orig.type==="diaper"){
-      updated.subtype=state.editingLog.subtype||orig.subtype;
+      updated.subtype=editL.subtype||orig.subtype;
     } else if(orig.type==="med"){
       const mnEl=document.getElementById("edit-med-name");
       const mdEl=document.getElementById("edit-med-dose");
