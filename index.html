@@ -22,6 +22,14 @@ input,textarea{font-family:'Nunito',sans-serif}
 .sync-dot.busy{background:#FFB300;animation:pulse .8s infinite}
 .sync-dot.err{background:#E05A5A}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* Custom confirm dialog */
+#bt-confirm{position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+#bt-confirm-box{background:#fff;border-radius:16px;padding:24px 20px;width:100%;max-width:320px;text-align:center;direction:rtl;font-family:'Nunito',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
+#bt-confirm-msg{font-size:16px;font-weight:800;color:#3A4A5C;margin-bottom:20px;line-height:1.4}
+#bt-confirm-btns{display:flex;gap:10px}
+#bt-confirm-btns button{flex:1;padding:13px 0;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer}
+#bt-confirm-yes{background:#E05A5A;color:#fff}
+#bt-confirm-no{background:#f0f4f8;color:#3A4A5C}
 /* Desktop wrapper */
 #app-inner{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
 @media(min-width:600px){
@@ -672,7 +680,25 @@ function attachEvents(){
   const de=document.getElementById("dob-edit-input");if(de)de.addEventListener("input",e=>state.dobInput=e.target.value);
 }
 
-function handleAction(e,el){
+// ── Custom confirm dialog ──────────────────────────────────────────────────
+function btConfirm(msg, yesLabel, onYes, danger=true){
+  const overlay=document.createElement("div");
+  overlay.id="bt-confirm";
+  overlay.innerHTML=`
+    <div id="bt-confirm-box">
+      <div id="bt-confirm-msg">${msg}</div>
+      <div id="bt-confirm-btns">
+        <button id="bt-confirm-no" style="pointer-events:auto">ביטול</button>
+        <button id="bt-confirm-yes" style="background:${danger?"#E05A5A":"#2C6BAC"};color:#fff;pointer-events:auto">${yesLabel}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("bt-confirm-yes").onclick=()=>{overlay.remove();onYes();};
+  document.getElementById("bt-confirm-no").onclick=()=>overlay.remove();
+  overlay.addEventListener("click",e=>{if(e.target===overlay)overlay.remove();});
+}
+
+
   el=el||e.currentTarget;
   const action=el.dataset.action;
 
@@ -691,17 +717,19 @@ function handleAction(e,el){
     });
   }
   else if(action==="delete-baby"){
-    if(!confirm("למחוק תינוק זה וכל הנתונים שלו?"))return;
     const id=el.dataset.id;
-    setSyncStatus("busy");
-    sb.deleteLogs(id).then(()=>sb.deleteBaby(id)).then(()=>{
-      const babies=state.babies.filter(b=>b.id!==id);
-      store.saveBabies(babies);
-      setState({babies,syncStatus:"ok"});
-    }).catch(()=>{
-      const babies=state.babies.filter(b=>b.id!==id);
-      store.saveBabies(babies);
-      setState({babies,syncStatus:"err"});
+    const baby=state.babies.find(b=>b.id===id);
+    btConfirm(`למחוק את ${baby?.name||"התינוק"} וכל הנתונים שלו?`,"מחק",()=>{
+      setSyncStatus("busy");
+      sb.deleteLogs(id).then(()=>sb.deleteBaby(id)).then(()=>{
+        const babies=state.babies.filter(b=>b.id!==id);
+        store.saveBabies(babies);
+        setState({babies,syncStatus:"ok"});
+      }).catch(()=>{
+        const babies=state.babies.filter(b=>b.id!==id);
+        store.saveBabies(babies);
+        setState({babies,syncStatus:"err"});
+      });
     });
   }
   else if(action==="start-add")setState({addingBaby:true});
@@ -726,24 +754,27 @@ function handleAction(e,el){
     setState({modal:el.dataset.type,feedType:"breast_left",amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
   }
   else if(action==="close-modal"){
-    if(!confirm("לסגור ולבטל את הרישום?"))return;
-    clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});
+    btConfirm("לסגור ולבטל את הרישום?","סגור",()=>{
+      clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});
+    },false);
   }
   else if(action==="save-log")saveLog();
   else if(action==="delete-log"){
     const lid=el.dataset.id;
-    if(!confirm("למחוק רשומה זו?"))return;
-    const logs=state.logs.filter(l=>String(l.id)!==lid);
-    store.saveLogs(state.selectedBaby.id,logs);
-    setState({logs,syncStatus:"busy"});
-    sb.deleteLog(lid).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
+    btConfirm("למחוק רשומה זו?","מחק",()=>{
+      const logs=state.logs.filter(l=>String(l.id)!==lid);
+      store.saveLogs(state.selectedBaby.id,logs);
+      setState({logs,syncStatus:"busy"});
+      sb.deleteLog(lid).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
+    });
   }
   else if(action==="export-csv")exportCSV(state.logs,state.selectedBaby.name);
   else if(action==="clear-logs"){
-    if(!confirm("למחוק את כל הנתונים?"))return;
-    store.saveLogs(state.selectedBaby.id,[]);
-    setState({logs:[],syncStatus:"busy"});
-    sb.deleteLogs(state.selectedBaby.id).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
+    btConfirm("למחוק את כל הנתונים של "+state.selectedBaby.name+"?","מחק הכל",()=>{
+      store.saveLogs(state.selectedBaby.id,[]);
+      setState({logs:[],syncStatus:"busy"});
+      sb.deleteLogs(state.selectedBaby.id).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
+    });
   }
   else if(action==="edit-dob")setState({editDob:true,dobInput:state.selectedBaby.dob||""});
   else if(action==="cancel-dob")setState({editDob:false});
