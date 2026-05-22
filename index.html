@@ -982,11 +982,16 @@ function attachEvents(){
         setState({editingLog:{...state.editingLog,subtype:diaperBtn.dataset.editDiaper}});
         return;
       }
+      // view-log — handle before generic data-action
+      const vl=e.target.closest("[data-action='view-log']");
+      if(vl){
+        const lid=vl.dataset.id;
+        const log=state.logs.find(l=>String(l.id)===lid);
+        if(log){showLogView(log);}
+        return;
+      }
       const el=e.target.closest("[data-action]");
       if(el)handleAction(e,el);
-      // view-log on log body click
-      const vl=e.target.closest("[data-action='view-log']");
-      if(vl){const lid=vl.dataset.id;const log=state.logs.find(l=>String(l.id)===lid);if(log)showLogView(log);}
     });
     _eventsAttached=true;
   }
@@ -1017,6 +1022,7 @@ function btConfirm(msg, yesLabel, onYes, danger=true){
 function handleAction(e,el){
   el=el||e.currentTarget;
   const action=el.dataset.action;
+  e.stopPropagation();
 
   if(action==="sync-refresh"){init();return;}
 
@@ -1138,7 +1144,7 @@ function handleAction(e,el){
   else if(action==="open-edit"){
     const lid=el.dataset.id;
     const log=state.logs.find(l=>String(l.id)===lid);
-    if(log)setState({editingLog:{...log}});
+    if(log)setState({editingLog:{...log,id:String(log.id)}});
   }
   else if(action==="close-edit")setState({editingLog:null});
   else if(action==="save-edit"){
