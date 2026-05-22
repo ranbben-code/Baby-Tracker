@@ -724,10 +724,14 @@ function handleAction(e,el){
     clearInterval(sleepTimer);clearInterval(feedTimer);
     setState({modal:el.dataset.type,feedType:"breast_left",amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
   }
-  else if(action==="close-modal"){clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});}
+  else if(action==="close-modal"){
+    if(!confirm("לסגור ולבטל את הרישום?"))return;
+    clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});
+  }
   else if(action==="save-log")saveLog();
   else if(action==="delete-log"){
     const lid=el.dataset.id;
+    if(!confirm("למחוק רשומה זו?"))return;
     const logs=state.logs.filter(l=>String(l.id)!==lid);
     store.saveLogs(state.selectedBaby.id,logs);
     setState({logs,syncStatus:"busy"});
