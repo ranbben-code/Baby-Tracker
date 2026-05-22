@@ -566,17 +566,24 @@ function renderLogItem(l,catIcons){
   if(feedLabel)detail+=feedLabel;
   if(diaperLabel)detail+=diaperLabel;
   if(l.medName)detail+=l.medName+(l.medDose?" · "+l.medDose:"");
-  if(l.ml)detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
-  else if(l.amount)detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
+  // show per-type ml if available
+  if(l.mlByType&&Object.keys(l.mlByType).length>0){
+    const parts=Object.entries(l.mlByType).map(([t,m])=>{const ft=FEED_TYPES.find(f=>f.value===t);return`${ft?.label||t}: ${m} מ״ל`;});
+    detail+=` · <strong style="color:${c.accent}">${parts.join(" | ")}</strong>`;
+  } else if(l.ml){
+    detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
+  } else if(l.amount){
+    detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
+  }
   if(l.durationMs>0)detail+=" · "+dur(l.durationMs);
   if(l.note)detail+=" · "+l.note;
   const dateStr=new Date(l.ts).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"});
   return`
-    <div style="display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:8px;background:${c.bg};margin-bottom:6px;border:1px solid ${c.border}">
-      <div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px;border:1px solid ${c.border}">${svgIcon(catIcons[l.type]||ICONS.note,16,c.accent)}</div>
+    <div style="display:flex;align-items:flex-start;gap:9px;padding:10px 11px;border-radius:8px;background:${c.bg};margin-bottom:6px;border:1px solid ${c.border}">
+      <div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px;border:1px solid ${c.border};margin-top:2px">${svgIcon(catIcons[l.type]||ICONS.note,16,c.accent)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:12px;color:${c.accent}">${c.label}</div>
-        <div style="font-size:11px;color:${T.slate};margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${detail}</div>
+        <div style="font-size:11px;color:${T.slate};margin-top:2px;word-break:break-word;line-height:1.5">${detail}</div>
       </div>
       <div style="text-align:center;flex-shrink:0;min-width:40px">
         <div style="font-size:12px;font-weight:800;color:${c.accent}">${fmtTime(l.ts)}</div>
@@ -590,31 +597,58 @@ function renderLogItem(l,catIcons){
 function renderEditModal(l){
   const c=CAT[l.type];
   const dtVal=new Date(l.ts-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
+  // for feed: editingLog holds current subtype selections
+  const editL=state.editingLog||l;
   let inner="";
   if(l.type==="feed"){
+    const currentTypes=(editL.subtype||"").split(",").filter(Boolean);
+    const mlByType=editL.mlByType||{};
     inner=`
-      <div style="margin-bottom:12px">
-        <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">סוג האכלה</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          ${FEED_TYPES.map(f=>`<button data-edit-feed="${f.value}" style="padding:8px 12px;border-radius:6px;border:1.5px solid ${(l.subtype||"breast_left")===f.value?c.accent:"#C8DAE8"};background:${(l.subtype||"breast_left")===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${(l.subtype||"breast_left")===f.value?c.accent:T.slate}">${f.label}</button>`).join("")}
-        </div>
+      <div style="margin-bottom:6px;font-size:12px;color:${T.muted};font-weight:700">סוג האכלה (ניתן לבחור כמה)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        ${FEED_TYPES.map(f=>{
+          const sel=currentTypes.includes(f.value);
+          return`<button data-edit-feed="${f.value}" style="padding:9px 13px;border-radius:6px;border:2px solid ${sel?c.accent:"#C8DAE8"};background:${sel?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${sel?c.accent:T.slate}">${sel?"✓ ":""}${f.label}</button>`;
+        }).join("")}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-        <div>
-          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">כמות / משך</label>
-          <input id="edit-amount" type="number" inputmode="numeric" value="${l.amount||""}" placeholder="כמות" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-        </div>
-        <div>
-          <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
-          <input id="edit-ml" type="number" inputmode="numeric" value="${l.ml||""}" placeholder="מ״ל" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-        </div>
-      </div>`;
+      ${currentTypes.length===0?`<div style="color:${T.muted};font-size:13px;margin-bottom:12px">בחר סוג האכלה למעלה</div>`:""}
+      ${currentTypes.length===1?(()=>{
+        const isBreast=currentTypes[0].includes("breast");
+        return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות (מ״ל)"}</label>
+            <input id="edit-amount-0" type="number" inputmode="numeric" value="${editL.amount||""}" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
+            <input id="edit-ml-0" type="number" inputmode="numeric" value="${editL.ml||""}" placeholder="80" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+          </div>
+        </div>`;
+      })():""}
+      ${currentTypes.length>1?currentTypes.map((t,i)=>{
+        const ft=FEED_TYPES.find(f=>f.value===t);
+        const isBreast=t.includes("breast");
+        const savedMl=mlByType[t]||"";
+        return`<div style="background:${c.bg};border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid ${c.border}">
+          <div style="font-size:12px;font-weight:800;color:${c.accent};margin-bottom:8px">${ft?.label||t}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות"}</label>
+              <input id="edit-amount-${i}" type="number" inputmode="numeric" placeholder="${isBreast?"15":"120"}" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            </div>
+            <div>
+              <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">מ״ל</label>
+              <input id="edit-ml-${i}" type="number" inputmode="numeric" value="${savedMl}" placeholder="80" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+            </div>
+          </div>
+        </div>`;
+      }).join(""):""}`;
   } else if(l.type==="diaper"){
     inner=`
       <div style="margin-bottom:12px">
         <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">סוג חיתול</label>
         <div style="display:flex;gap:8px">
-          ${DIAPER_TYPES.map(d=>`<button data-edit-diaper="${d.value}" style="flex:1;padding:12px 6px;border-radius:6px;border:1.5px solid ${(l.subtype||"wet")===d.value?c.accent:"#C8DAE8"};background:${(l.subtype||"wet")===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${(l.subtype||"wet")===d.value?c.accent:T.slate};text-align:center">${d.label}</button>`).join("")}
+          ${DIAPER_TYPES.map(d=>`<button data-edit-diaper="${d.value}" style="flex:1;padding:12px 6px;border-radius:6px;border:1.5px solid ${(editL.subtype||"wet")===d.value?c.accent:"#C8DAE8"};background:${(editL.subtype||"wet")===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${(editL.subtype||"wet")===d.value?c.accent:T.slate};text-align:center">${d.label}</button>`).join("")}
         </div>
       </div>`;
   } else if(l.type==="med"){
@@ -639,7 +673,7 @@ function renderEditModal(l){
           <span style="font-size:16px;font-weight:800;color:${c.accent}">✏️ עריכת ${c.label}</span>
           <button data-action="close-edit" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:${T.muted};font-size:14px">✕</button>
         </div>
-        <div style="padding:16px 18px 40px" id="edit-modal-body">
+        <div style="padding:16px 18px 40px">
           ${inner}
           <div style="margin-bottom:12px">
             <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">שעה ותאריך</label>
@@ -861,7 +895,10 @@ function attachEvents(){
       // handle edit feed/diaper type buttons
       const feedBtn=e.target.closest("[data-edit-feed]");
       if(feedBtn&&state.editingLog){
-        setState({editingLog:{...state.editingLog,subtype:feedBtn.dataset.editFeed}});
+        const val=feedBtn.dataset.editFeed;
+        const cur=(state.editingLog.subtype||"").split(",").filter(Boolean);
+        const next=cur.includes(val)?cur.filter(t=>t!==val):[...cur,val];
+        setState({editingLog:{...state.editingLog,subtype:next.join(",")}});
         return;
       }
       const diaperBtn=e.target.closest("[data-edit-diaper]");
@@ -1036,14 +1073,27 @@ function handleAction(e,el){
     const note=noteEl?noteEl.value:orig.note;
     let updated={...orig,ts:isNaN(newTs)?orig.ts:newTs,note};
     if(orig.type==="feed"){
-      const amtEl=document.getElementById("edit-amount");
-      const mlEl=document.getElementById("edit-ml");
-      const selFeed=document.querySelector("[data-edit-feed].edit-selected");
-      updated.amount=amtEl&&amtEl.value?Number(amtEl.value):orig.amount;
-      updated.ml=mlEl&&mlEl.value?Number(mlEl.value):orig.ml;
-      // subtype handled via edit-selected class
-      const picked=document.querySelector("[data-edit-feed]");
-      if(picked)updated.subtype=state.editingLog.subtype||orig.subtype;
+      const types=(editL.subtype||"").split(",").filter(Boolean);
+      let amount=null,ml=null,mlByType={};
+      if(types.length<=1){
+        const amtEl=document.getElementById("edit-amount-0");
+        const mlEl=document.getElementById("edit-ml-0");
+        amount=amtEl?.value?Number(amtEl.value):orig.amount;
+        ml=mlEl?.value?Number(mlEl.value):orig.ml;
+      } else {
+        types.forEach((t,i)=>{
+          const amtEl=document.getElementById("edit-amount-"+i);
+          const mlEl=document.getElementById("edit-ml-"+i);
+          const m=mlEl?.value?Number(mlEl.value):null;
+          if(m)mlByType[t]=m;
+          if(amtEl?.value&&!amount)amount=Number(amtEl.value);
+        });
+        ml=Object.values(mlByType).reduce((s,v)=>s+v,0)||null;
+      }
+      updated.subtype=editL.subtype||orig.subtype;
+      updated.amount=amount;
+      updated.ml=ml;
+      updated.mlByType=Object.keys(mlByType).length?mlByType:null;
     } else if(orig.type==="diaper"){
       updated.subtype=state.editingLog.subtype||orig.subtype;
     } else if(orig.type==="med"){
