@@ -14,6 +14,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
 body{font-family:'Nunito',sans-serif;direction:rtl;background:#EEF6FD;min-height:100vh;overflow-x:hidden}
 button{font-family:'Nunito',sans-serif}
+button *{pointer-events:none}
 input,textarea{font-family:'Nunito',sans-serif}
 ::-webkit-scrollbar{display:none}
 .sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:6px}
@@ -578,7 +579,7 @@ function renderModal(type,isNight){
   if(type==="feed"){
     inner=`
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-        ${FEED_TYPES.map(f=>`<button data-action="set-feed-type" data-val="${f.value}" style="padding:10px 13px;border-radius:6px;border:1.5px solid ${state.feedType===f.value?c.accent:"#C8DAE8"};background:${state.feedType===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${state.feedType===f.value?c.accent:T.slate}">${f.label}</button>`).join("")}
+        ${FEED_TYPES.map(f=>`<button data-action="set-feed-type" data-val="${f.value}" style="padding:10px 13px;border-radius:6px;border:1.5px solid ${state.feedType===f.value?c.accent:"#C8DAE8"};background:${state.feedType===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${state.feedType===f.value?c.accent:T.slate}"><span style="pointer-events:none">${f.label}</span></button>`).join("")}
       </div>
       ${state.feedType.includes("breast")?`
         <div style="background:${c.bg};border-radius:8px;padding:16px;text-align:center;margin-bottom:14px;border:1px solid ${c.accent}30">
@@ -605,7 +606,7 @@ function renderModal(type,isNight){
         ${svgIcon(ICONS.clock,13,c.accent)} שעת האכלה: ${new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}
       </div>`;
   }else if(type==="diaper"){
-    inner=`<div style="display:flex;gap:8px;margin-bottom:16px">${DIAPER_TYPES.map(d=>`<button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center">${d.label}</button>`).join("")}</div>`;
+    inner=`<div style="display:flex;gap:8px;margin-bottom:16px">${DIAPER_TYPES.map(d=>`<button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center"><span style="pointer-events:none">${d.label}</span></button>`).join("")}</div>`;
   }else if(type==="sleep"){
     inner=`
       <div style="text-align:center;margin-bottom:20px">
