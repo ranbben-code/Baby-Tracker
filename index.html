@@ -258,6 +258,7 @@ let state={
   sleeping:false,sleepStart:null,elapsed:0,timerMs:null,
   feedRunning:false,feedStart:null,feedEl:0,
   editingTimeId:null,
+  openDays:{},
   syncStatus:"ok", // ok | busy | err
 };
 
@@ -426,8 +427,9 @@ function renderDashboard(){
         </div>
       </div>
 
-      ${todayLogs.length>0?`<div style="${C()}"><div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">היום</div>${todayLogs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
-      ${ystLogs.length>0?`<div style="${C()}"><div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">אתמול</div>${ystLogs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
+      ${todayLogs.length>0||ystLogs.length>0?
+        groupByDay([...todayLogs,...ystLogs]).map(day=>renderDayCard(day,C,ts,tp,catIcons,isNight)).join("")
+        :""}
       ${todayLogs.length===0&&ystLogs.length===0?`
         <div style="text-align:center;padding:32px 0;color:${ts}">
           <div style="display:flex;justify-content:center;margin-bottom:10px;opacity:0.35">${bearSVG(false,46)}</div>
@@ -437,12 +439,10 @@ function renderDashboard(){
   } else if(state.tab==="charts"){
     tabContent=renderCharts(logs,isNight,ts,C);
   } else {
+    const allDays=groupByDay(logs);
     tabContent=`
-      <div style="${C()}">
-        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">כל הרשומות של ${baby.name}</div>
-        ${logs.length===0?`<div style="color:${ts};text-align:center;padding:16px;font-size:13px">אין רשומות עדיין</div>`:""}
-        ${logs.map(l=>renderLogItem(l,catIcons)).join("")}
-      </div>
+      ${logs.length===0?`<div style="${C()}text-align:center;padding:16px;font-size:13px;color:${ts}">אין רשומות עדיין</div>`:""}
+      ${allDays.map(day=>renderDayCard(day,C,ts,tp,catIcons,isNight)).join("")}
       <button data-action="export-csv" style="background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
         ${svgIcon(ICONS.export,15,"#fff")} ייצוא ל-CSV
       </button>
@@ -548,13 +548,66 @@ function renderLogItem(l,catIcons){
     </div>`;
 }
 
+function groupByDay(logs){
+  // returns array of {dateKey, dateLabel, isToday, isYesterday, logs} sorted newest first
+  const days={};
+  logs.forEach(l=>{
+    const d=new Date(Number(l.ts));
+    d.setHours(0,0,0,0);
+    const key=d.getTime();
+    if(!days[key])days[key]={ts:key,logs:[]};
+    days[key].logs.push(l);
+  });
+  const today=new Date();today.setHours(0,0,0,0);
+  const yday=new Date(today);yday.setDate(yday.getDate()-1);
+  return Object.values(days).sort((a,b)=>b.ts-a.ts).map(d=>{
+    const isToday=d.ts===today.getTime();
+    const isYday=d.ts===yday.getTime();
+    const label=isToday?"היום":isYday?"אתמול":new Date(d.ts).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"});
+    const feeds=d.logs.filter(l=>l.type==="feed");
+    const diapers=d.logs.filter(l=>l.type==="diaper");
+    const sleeps=d.logs.filter(l=>l.type==="sleep");
+    const ml=feeds.reduce((s,l)=>s+(Number(l.ml)||0),0);
+    const slMs=sleeps.reduce((s,l)=>s+(l.durationMs||0),0);
+    return{...d,label,isToday,isYday,feeds:feeds.length,diapers:diapers.length,sleeps:sleeps.length,ml,slMs};
+  });
+}
+
+function renderDayCard(day,C,ts,tp,catIcons,isNight){
+  const isOpen=state.openDays&&state.openDays[day.ts];
+  const summaryParts=[];
+  if(day.feeds>0)summaryParts.push(`${day.feeds} האכלות${day.ml?` · ${day.ml} מ״ל`:""}`);
+  if(day.diapers>0)summaryParts.push(`${day.diapers} חיתולים`);
+  if(day.slMs>0)summaryParts.push(dur(day.slMs)+" שינה");
+  return`
+    <div style="${C("margin-bottom:10px;padding:0;")}overflow:hidden">
+      <button data-action="toggle-day" data-day="${day.ts}"
+        style="width:100%;background:none;border:none;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:right">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:800;font-size:14px;color:${day.isToday?T.blue:tp}">${day.label}</div>
+          <div style="font-size:11px;color:${ts};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summaryParts.join(" · ")||"אין רשומות"}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${day.feeds>0?`<span style="background:${T.bluePale};color:${T.blue};border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">🍼${day.feeds}</span>`:""}
+          ${day.diapers>0?`<span style="background:${T.tealLight};color:${T.teal};border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">👶${day.diapers}</span>`:""}
+          ${day.sleeps>0?`<span style="background:${T.lavender};color:#5B6FA6;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">🌙${day.sleeps}</span>`:""}
+        </div>
+        <div style="color:${ts};font-size:14px;flex-shrink:0">${isOpen?"▲":"▼"}</div>
+      </button>
+      ${isOpen?`<div style="padding:0 12px 12px">${day.logs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
+    </div>`;
+}
+
 function renderCharts(logs,isNight,ts,C){
+  const safeLogs=logs.map(l=>({...l,ts:Number(l.ts)}));
   const last7=Array.from({length:7},(_,i)=>{
     const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-6+i);
     const n=new Date(d);n.setDate(n.getDate()+1);
-    const dl=logs.filter(l=>l.ts>=d.getTime()&&l.ts<n.getTime());
+    const dl=safeLogs.filter(l=>l.ts>=d.getTime()&&l.ts<n.getTime());
     return{day:d.toLocaleDateString("he-IL",{weekday:"short"}),ml:dl.filter(l=>l.type==="feed").reduce((s,l)=>s+(Number(l.ml)||0),0),hrs:+(dl.filter(l=>l.type==="sleep").reduce((s,l)=>s+(l.durationMs||0),0)/3600000).toFixed(1),diapers:dl.filter(l=>l.type==="diaper").length};
   });
+  const hasData=last7.some(d=>d.ml>0||d.hrs>0||d.diapers>0);
+  if(!hasData)return`<div style="${C()}text-align:center;padding:32px 0;color:${ts}"><div style="font-size:32px;margin-bottom:10px">📊</div><div style="font-weight:700;font-size:14px">עדיין אין מספיק נתונים</div><div style="font-size:12px;margin-top:4px">הגרפים יופיעו אחרי כמה רישומים</div></div>`;
   return[
     {key:"ml",label:'מ״ל האכלה',unit:'מ"ל',color:T.blue,type:"bar",icon:ICONS.bottle},
     {key:"hrs",label:"שעות שינה",unit:"שע׳",color:"#5B6FA6",type:"line",icon:ICONS.moon},
@@ -574,7 +627,7 @@ function renderCharts(logs,isNight,ts,C){
     }else{
       const padX=14,pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:H-(d.val/max)*H,val:d.val,day:d.day}));
       svg=`<path d="${pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")}" fill="none" stroke="${ch.color}" stroke-width="2" stroke-linejoin="round"/>`;
-      svg+=pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}<text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>`).join("");
+      svg+=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}<text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>`).join("");
     }
     return`<div style="${C()}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="display:flex;align-items:center;gap:6px">${svgIcon(ch.icon,14,isNight?"rgba(255,255,255,0.5)":T.muted)}<span style="font-size:12px;font-weight:700;color:${ts}">${ch.label} — 7 ימים</span></div><span style="font-size:13px;font-weight:800;color:${ch.color}">${last7[6][ch.key]} ${ch.unit} היום</span></div><svg viewBox="0 0 ${W} ${H+24}" style="width:100%">${svg}</svg></div>`;
   }).join("");
@@ -699,6 +752,7 @@ function btConfirm(msg, yesLabel, onYes, danger=true){
 }
 
 
+function handleAction(e,el){
   el=el||e.currentTarget;
   const action=el.dataset.action;
 
@@ -813,6 +867,11 @@ function btConfirm(msg, yesLabel, onYes, danger=true){
   }
   else if(action==="sleep-stop"){clearInterval(sleepTimer);setState({sleeping:false});}
   else if(action==="set-diaper-type")setState({diaperType:el.dataset.val});
+  else if(action==="toggle-day"){
+    const day=el.dataset.day;
+    const openDays={...state.openDays,[day]:!state.openDays[day]};
+    setState({openDays});
+  }
   else if(action==="edit-time")setState({editingTimeId:el.dataset.id});
   else if(action==="cancel-time")setState({editingTimeId:null});
   else if(action==="save-time"){
