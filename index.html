@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#2C6BAC"/>
+<meta name="apple-mobile-web-app-title" content="Baby Tracker"/>
+<link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;Baby Tracker&quot;,&quot;short_name&quot;:&quot;Baby&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%232C6BAC&quot;,&quot;theme_color&quot;:&quot;%232C6BAC&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;lang&quot;:&quot;he&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;},{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}"/>
 <title>Baby Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍼</text></svg>"/>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232C6BAC'/><text y='.9em' font-size='75' x='10'>🍼</text></svg>"/>
@@ -16,12 +16,89 @@ body{font-family:'Nunito',sans-serif;direction:rtl;background:#EEF6FD;min-height
 button{font-family:'Nunito',sans-serif}
 input,textarea{font-family:'Nunito',sans-serif}
 ::-webkit-scrollbar{display:none}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:6px}
+.sync-dot.ok{background:#4CAF82}
+.sync-dot.busy{background:#FFB300;animation:pulse .8s infinite}
+.sync-dot.err{background:#E05A5A}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* Desktop wrapper */
+#app-inner{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
+@media(min-width:600px){
+  body{background:#D6E9F8}
+  #app-inner{box-shadow:0 0 40px rgba(44,107,172,0.18);background:#EEF6FD}
+}
 </style>
 </head>
 <body>
-<div id="app"></div>
-
+<div id="app"><div id="app-inner"></div></div>
 <script>
+// ── Supabase ───────────────────────────────────────────────────────────────
+const SB_URL="https://xndmzuasewpotpphlecx.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZG16dWFzZXdwb3RwcGhsZWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MDY3MTEsImV4cCI6MjA5NDk4MjcxMX0.JsSzL3vOduGsuoQr9t7YcNGLVlyRTG1XGgr32IbI4vo";
+
+async function sbFetch(path,opts={}){
+  const res=await fetch(SB_URL+"/rest/v1/"+path,{
+    headers:{
+      "apikey":SB_KEY,
+      "Authorization":"Bearer "+SB_KEY,
+      "Content-Type":"application/json",
+      "Prefer":opts.prefer||"return=representation",
+      ...(opts.headers||{})
+    },
+    ...opts
+  });
+  if(!res.ok){const t=await res.text();throw new Error(t);}
+  const t=await res.text();
+  return t?JSON.parse(t):[];
+}
+
+const sb={
+  getBabies:()=>sbFetch("babies?select=*&order=created_at.asc"),
+  upsertBaby:b=>sbFetch("babies",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(b)}),
+  deleteBaby:id=>sbFetch("babies?id=eq."+id,{method:"DELETE",prefer:""}),
+  getLogs:bid=>sbFetch("logs?baby_id=eq."+bid+"&select=*&order=ts.desc"),
+  upsertLog:l=>sbFetch("logs",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(l)}),
+  deleteLog:id=>sbFetch("logs?id=eq."+id,{method:"DELETE",prefer:""}),
+  deleteLogs:bid=>sbFetch("logs?baby_id=eq."+bid,{method:"DELETE",prefer:""}),
+};
+
+// map app log → db row
+function logToRow(l,babyId){
+  return{
+    id:String(l.id),
+    baby_id:babyId,
+    type:l.type,
+    ts:l.ts,
+    subtype:l.subtype||null,
+    amount:l.amount||null,
+    ml:l.ml||null,
+    duration_ms:l.durationMs||null,
+    med_name:l.medName||null,
+    med_dose:l.medDose||null,
+    note:l.note||null
+  };
+}
+function rowToLog(r){
+  return{
+    id:r.id,
+    type:r.type,
+    ts:Number(r.ts),
+    subtype:r.subtype,
+    amount:r.amount,
+    ml:r.ml,
+    durationMs:r.duration_ms,
+    medName:r.med_name,
+    medDose:r.med_dose,
+    note:r.note
+  };
+}
+function babyToRow(b){
+  return{id:String(b.id),name:b.name,emoji:b.emoji,dob:b.dob||null,created_at:b.createdAt||Date.now()};
+}
+function rowToBaby(r){
+  return{id:r.id,name:r.name,emoji:r.emoji,dob:r.dob,createdAt:r.created_at};
+}
+
 // ── Theme ──────────────────────────────────────────────────────────────────
 const T={
   blue:"#2C6BAC",blueMid:"#4A8FD4",blueLight:"#D6E9F8",bluePale:"#EEF6FD",
@@ -44,7 +121,6 @@ const DIAPER_TYPES=[
   {value:"dirty",label:"מלוכלך 💩"},
   {value:"both", label:"שניהם"},
 ];
-
 const FEED_TYPES=[
   {value:"breast_left", label:"הנקה שמאל"},
   {value:"breast_right",label:"הנקה ימין"},
@@ -52,10 +128,9 @@ const FEED_TYPES=[
   {value:"expressed",   label:"חלב מבוטא"},
   {value:"solids",      label:"מוצקים 🥣"},
 ];
-
 const BABY_EMOJIS=["☁️","🌿","🌊","🍃","❄️","🌸","🌾","🌙","⭐","🫧"];
 
-// ── Storage ────────────────────────────────────────────────────────────────
+// ── Storage (localStorage fallback) ───────────────────────────────────────
 const store={
   getBabies:()=>{try{return JSON.parse(localStorage.getItem("bt_babies")||"[]")}catch{return[]}},
   saveBabies:l=>localStorage.setItem("bt_babies",JSON.stringify(l)),
@@ -79,26 +154,9 @@ const calcAge=dob=>{
   return rm>0?y+" שנים ו-"+rm+" חודשים":y+" שנים";
 };
 
-function exportCSV(logs,name){
-  const rows=[["שם","סוג","תת-סוג","מ״ל","משך","שעה","הערה"]];
-  logs.forEach(l=>rows.push([name,CAT[l.type]?.label||l.type,l.subtype||"",l.ml||"",l.amount||(l.durationMs?dur(l.durationMs):""),new Date(l.ts).toLocaleString("he-IL"),l.note||""]));
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(r=>r.map(c=>'"'+c+'"').join(",")).join("\n")],{type:"text/csv;charset=utf-8;"}));
-  a.download=name+".csv";a.click();
-}
-
-function backupAll(babies){
-  const data={version:1,exportedAt:new Date().toISOString(),babies,logs:Object.fromEntries(babies.map(b=>[b.id,store.getLogs(b.id)]))};
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
-  a.download="baby-backup-"+new Date().toLocaleDateString("he-IL").replace(/\./g,"-")+".json";a.click();
-}
-
-// ── SVG helpers ────────────────────────────────────────────────────────────
 function svgIcon(path,size=20,color="currentColor"){
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}"><path d="${path}"/></svg>`;
+  return`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}"><path d="${path}"/></svg>`;
 }
-
 const ICONS={
   bottle:"M6 2l1.5 4H4v2h1l1 12h12l1-12h1V6h-3.5L17 2H6z",
   diaper:"M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
@@ -109,12 +167,7 @@ const ICONS={
   sun:"M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z",
   trash:"M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
   export:"M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
-  import:"M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z",
   edit:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
-  play:"M8 5v14l11-7z",
-  pause:"M6 19h4V5H6v14zm8-14v14h4V5h-4z",
-  stop:"M6 6h12v12H6z",
-  check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
   save:"M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
   plus:"M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   swap:"M7.5 21H2V9h5.5v12zm7.25-18h-5.5v18h5.5V3zM22 11h-5.5v10H22V11z",
@@ -122,6 +175,7 @@ const ICONS={
   note:"M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z",
   feed:"M6 2l1.5 4H4v2h1l1 12h12l1-12h1V6h-3.5L17 2H6z",
   med:"M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z",
+  refresh:"M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z",
 };
 
 function bearSVG(sleeping=false,size=44){
@@ -132,7 +186,7 @@ function bearSVG(sleeping=false,size=44){
       <circle cx="28" cy="23" r="3" fill="${T.bearDark}"/>
       <circle cx="17" cy="22" r="1" fill="#fff"/>
       <circle cx="29" cy="22" r="1" fill="#fff"/>`;
-  return `<svg viewBox="0 0 44 46" width="${size}" height="${size+2}" style="display:block">
+  return`<svg viewBox="0 0 44 46" width="${size}" height="${size+2}" style="display:block">
     <circle cx="10" cy="10" r="9" fill="${T.bear}"/>
     <circle cx="34" cy="10" r="9" fill="${T.bear}"/>
     <circle cx="10" cy="10" r="5" fill="${T.bearLight}"/>
@@ -146,20 +200,18 @@ function bearSVG(sleeping=false,size=44){
 }
 
 function cloudsSVG(isNight){
-  if(isNight) return `
-    <rect width="100%" height="200" fill="url(#ngr)"/>
+  if(isNight)return`
     <defs><linearGradient id="ngr" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#0D1B2A"/><stop offset="100%" stop-color="#1B2B3C"/>
     </linearGradient></defs>
+    <rect width="100%" height="200" fill="url(#ngr)"/>
     <circle cx="40" cy="30" r="1.5" fill="#fff" opacity="0.5"/>
     <circle cx="100" cy="18" r="1" fill="#fff" opacity="0.5"/>
     <circle cx="160" cy="40" r="1.5" fill="#fff" opacity="0.6"/>
     <circle cx="230" cy="22" r="1" fill="#fff" opacity="0.5"/>
     <circle cx="290" cy="35" r="1.5" fill="#fff" opacity="0.4"/>
-    <circle cx="340" cy="15" r="1" fill="#fff" opacity="0.6"/>
-    <circle cx="370" cy="45" r="1.5" fill="#fff" opacity="0.5"/>
-  `;
-  return `
+    <circle cx="340" cy="15" r="1" fill="#fff" opacity="0.6"/>`;
+  return`
     <defs><linearGradient id="dgr" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#BDDFF7"/>
       <stop offset="60%" stop-color="#D6EEFC"/>
@@ -168,57 +220,86 @@ function cloudsSVG(isNight){
     <rect width="100%" height="200" fill="url(#dgr)"/>
     <g opacity="0.55"><ellipse cx="30" cy="45" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="42" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="46" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="50" rx="30" ry="12" fill="#fff"/></g>
     <g opacity="0.40" transform="translate(250,18) scale(0.9)"><ellipse cx="30" cy="25" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="22" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="26" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="30" rx="30" ry="12" fill="#fff"/></g>
-    <g opacity="0.30" transform="translate(130,55) scale(0.7)"><ellipse cx="30" cy="25" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="22" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="26" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="30" rx="30" ry="12" fill="#fff"/></g>
-  `;
+    <g opacity="0.30" transform="translate(130,55) scale(0.7)"><ellipse cx="30" cy="25" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="22" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="26" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="30" rx="30" ry="12" fill="#fff"/></g>`;
+}
+
+function exportCSV(logs,name){
+  const rows=[["שם","סוג","תת-סוג","מ״ל","משך","שעה","הערה"]];
+  logs.forEach(l=>rows.push([name,CAT[l.type]?.label||l.type,l.subtype||"",l.ml||"",l.amount||(l.durationMs?dur(l.durationMs):""),new Date(l.ts).toLocaleString("he-IL"),l.note||""]));
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(r=>r.map(c=>'"'+c+'"').join(",")).join("\n")],{type:"text/csv;charset=utf-8;"}));
+  a.download=name+".csv";a.click();
 }
 
 // ── App State ──────────────────────────────────────────────────────────────
 let state={
-  screen:"selector", // selector | dashboard
-  babies:store.getBabies(),
+  screen:"loading",
+  babies:[],
   selectedBaby:null,
   logs:[],
   tab:"home",
   modal:null,
   isNight:null,
   addingBaby:false,
-  newBabyName:"",
-  newBabyEmoji:"☁️",
-  newBabyDob:"",
-  editDob:false,
-  dobInput:"",
-  // modal state
-  feedType:"breast_left",
-  amount:"",ml:"",
+  newBabyName:"",newBabyEmoji:"☁️",newBabyDob:"",
+  editDob:false,dobInput:"",
+  feedType:"breast_left",amount:"",ml:"",
   diaperType:"wet",
-  medName:"",medDose:"",
-  note:"",
+  medName:"",medDose:"",note:"",
   sleeping:false,sleepStart:null,elapsed:0,timerMs:null,
   feedRunning:false,feedStart:null,feedEl:0,
+  editingTimeId:null,
+  syncStatus:"ok", // ok | busy | err
 };
 
-let sleepTimer=null;
-let feedTimer=null;
-let clockTimer=null;
+let sleepTimer=null,feedTimer=null;
 
-function setState(patch){
-  Object.assign(state,patch);
-  render();
+function setState(patch){Object.assign(state,patch);render();}
+
+function setSyncStatus(s){state.syncStatus=s;const d=document.getElementById("sync-dot");if(d){d.className="sync-dot "+s;}}
+
+// ── Init: load from Supabase ───────────────────────────────────────────────
+async function init(){
+  setState({screen:"loading"});
+  try{
+    const rows=await sb.getBabies();
+    const babies=rows.map(rowToBaby);
+    store.saveBabies(babies);
+    setState({screen:"selector",babies});
+  }catch(e){
+    // fallback to localStorage
+    console.warn("Supabase unavailable, using local:",e);
+    setState({screen:"selector",babies:store.getBabies(),syncStatus:"err"});
+  }
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
-  const app=document.getElementById("app");
-  if(state.screen==="selector") app.innerHTML=renderSelector();
+  const app=document.getElementById("app-inner");
+  if(state.screen==="loading"){app.innerHTML=renderLoading();return;}
+  if(state.screen==="selector")app.innerHTML=renderSelector();
   else app.innerHTML=renderDashboard();
   attachEvents();
 }
 
-// ── Selector screen ────────────────────────────────────────────────────────
+function renderLoading(){
+  return`<div style="min-height:100vh;background:linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+    <div>${bearSVG(false,64)}</div>
+    <div style="font-size:18px;font-weight:800;color:${T.blue}">Baby Tracker</div>
+    <div style="font-size:13px;color:${T.muted}">מתחבר לענן...</div>
+    <div style="width:40px;height:4px;background:${T.blueLight};border-radius:4px;overflow:hidden">
+      <div style="width:40%;height:100%;background:${T.blue};border-radius:4px;animation:slide 1s infinite linear"></div>
+    </div>
+    <style>@keyframes slide{0%{margin-right:100%}100%{margin-right:-40%}}</style>
+  </div>`;
+}
+
+// ── Selector ───────────────────────────────────────────────────────────────
 function renderSelector(){
-  const night=false;
   const babies=state.babies;
-  return `
+  const syncColor=state.syncStatus==="ok"?T.green:state.syncStatus==="busy"?"#FFB300":T.danger;
+  const syncLabel=state.syncStatus==="ok"?"מסונכרן":state.syncStatus==="busy"?"מסנכרן...":"לא מחובר (נתונים מקומיים)";
+  return`
   <div style="min-height:100vh;background:linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%);padding-bottom:40px;position:relative;overflow:hidden">
     <svg viewBox="0 0 390 180" style="position:absolute;top:0;left:0;width:100%;height:180px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
       ${cloudsSVG(false)}
@@ -227,6 +308,13 @@ function renderSelector(){
       <div style="display:flex;justify-content:center;margin-bottom:8px">${bearSVG(false,52)}</div>
       <h1 style="font-size:24px;font-weight:900;color:${T.blue};letter-spacing:-0.5px;margin-bottom:4px">Baby Tracker</h1>
       <p style="color:${T.muted};font-size:13px;font-weight:700">בחר תינוק או הוסף חדש</p>
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px">
+        <span id="sync-dot" class="sync-dot ${state.syncStatus}"></span>
+        <span style="font-size:11px;color:${syncColor};font-weight:700">${syncLabel}</span>
+        <button data-action="sync-refresh" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center" title="רענן">
+          ${svgIcon(ICONS.refresh,14,T.muted)}
+        </button>
+      </div>
     </div>
     <div style="padding:0 14px">
       ${babies.map(b=>`
@@ -250,7 +338,7 @@ function renderSelector(){
           </div>
           <input id="new-baby-name" value="${state.newBabyName}" placeholder="שם התינוק" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${T.blue};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:10px"/>
           <label style="display:block;font-size:12px;font-weight:700;color:${T.muted};margin-bottom:5px">תאריך לידה</label>
-          <input id="new-baby-dob" type="date" value="${state.newBabyDob}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:12px"/>
+          <input id="new-baby-dob" type="date" value="${state.newBabyDob}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none;margin-bottom:12px"/>
           <div style="margin-bottom:14px">
             <div style="font-size:12px;font-weight:700;color:${T.muted};margin-bottom:7px">אמוג׳י</div>
             <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -267,22 +355,6 @@ function renderSelector(){
           ${svgIcon(ICONS.plus,16,T.blue)} הוסף תינוק חדש
         </button>
       `}
-
-      <div style="background:#fff;border-radius:10px;padding:16px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08)">
-        <div style="font-weight:800;font-size:13px;color:${T.slate};margin-bottom:4px;display:flex;align-items:center;gap:6px">
-          ${svgIcon(ICONS.save,14,T.blue)} גיבוי ושחזור
-        </div>
-        <div style="font-size:11px;color:${T.muted};margin-bottom:10px;line-height:1.6">מומלץ לגבות אחת לכמה ימים — שומר את כל הנתונים.</div>
-        <div style="display:flex;gap:8px">
-          <button data-action="backup" style="flex:1;background:${T.green};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-            ${svgIcon(ICONS.export,15,"#fff")} ייצוא
-          </button>
-          <button data-action="restore-click" style="flex:1;background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
-            ${svgIcon(ICONS.import,15,"#fff")} שחזור
-          </button>
-        </div>
-        <input id="restore-file" type="file" accept=".json" style="display:none"/>
-      </div>
     </div>
   </div>`;
 }
@@ -298,7 +370,7 @@ function renderDashboard(){
     :`background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08);${extra}`;
   const tp=isNight?"#EEF6FD":T.slate;
   const ts=isNight?"rgba(200,218,232,0.55)":T.muted;
-  const bg=isNight?"linear-gradient(180deg,#0D1B2A 0%,#1B2B3C 100%)":`linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%)`;
+  const bg=isNight?`linear-gradient(180deg,#0D1B2A 0%,#1B2B3C 100%)`:`linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%)`;
 
   const todayStart=new Date();todayStart.setHours(0,0,0,0);
   const ystStart=new Date(todayStart);ystStart.setDate(ystStart.getDate()-1);
@@ -310,7 +382,6 @@ function renderDashboard(){
   const totalMl=feeds.reduce((s,l)=>s+(Number(l.ml)||0),0);
   const totalSlMs=sleeps.reduce((s,l)=>s+(l.durationMs||0),0);
   const age=calcAge(baby.dob);
-
   const catIcons={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
 
   let tabContent="";
@@ -346,49 +417,30 @@ function renderDashboard(){
         </div>
       </div>
 
-      ${todayLogs.length>0?`
-        <div style="${C()}">
-          <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.clock,12,ts)} היום</div>
-          ${todayLogs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
-        </div>
-      `:""}
-      ${ystLogs.length>0?`
-        <div style="${C()}">
-          <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.history,12,ts)} אתמול</div>
-          ${ystLogs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
-        </div>
-      `:""}
+      ${todayLogs.length>0?`<div style="${C()}"><div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">היום</div>${todayLogs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
+      ${ystLogs.length>0?`<div style="${C()}"><div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">אתמול</div>${ystLogs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
       ${todayLogs.length===0&&ystLogs.length===0?`
         <div style="text-align:center;padding:32px 0;color:${ts}">
           <div style="display:flex;justify-content:center;margin-bottom:10px;opacity:0.35">${bearSVG(false,46)}</div>
           <div style="font-weight:700;font-size:14px;color:${tp}">עדיין לא רשמת היום</div>
           <div style="font-size:12px;margin-top:3px">לחץ על אחד הכפתורים למעלה</div>
-        </div>
-      `:""}
-    `;
+        </div>`:""}`;
   } else if(state.tab==="charts"){
     tabContent=renderCharts(logs,isNight,ts,C);
   } else {
     tabContent=`
       <div style="${C()}">
-        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px;display:flex;align-items:center;gap:5px">${svgIcon(ICONS.history,12,ts)} כל הרשומות של ${baby.name}</div>
+        <div style="font-size:12px;font-weight:700;color:${ts};margin-bottom:8px">כל הרשומות של ${baby.name}</div>
         ${logs.length===0?`<div style="color:${ts};text-align:center;padding:16px;font-size:13px">אין רשומות עדיין</div>`:""}
-        ${logs.map(l=>renderLogItem(l,ts,catIcons)).join("")}
+        ${logs.map(l=>renderLogItem(l,catIcons)).join("")}
       </div>
       <button data-action="export-csv" style="background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
         ${svgIcon(ICONS.export,15,"#fff")} ייצוא ל-CSV
       </button>
-      ${logs.length>0?`
-        <button data-action="clear-logs" style="background:#fff;color:${T.danger};border:1.5px solid ${T.danger};border-radius:6px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
-          ${svgIcon(ICONS.trash,15,T.danger)} מחק את כל הנתונים
-        </button>
-      `:""}
-    `;
+      ${logs.length>0?`<button data-action="clear-logs" style="background:#fff;color:${T.danger};border:1.5px solid ${T.danger};border-radius:6px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">${svgIcon(ICONS.trash,15,T.danger)} מחק את כל הנתונים</button>`:""}`;
   }
 
-  const modalHTML=state.modal?renderModal(state.modal,isNight):"";
-
-  return `
+  return`
   <div style="min-height:100vh;background:${bg};padding-bottom:80px;position:relative;overflow-x:hidden">
     <svg viewBox="0 0 390 200" style="position:absolute;top:0;left:0;width:100%;height:200px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
       ${cloudsSVG(isNight)}
@@ -398,9 +450,12 @@ function renderDashboard(){
         <button data-action="go-back" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 12px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${tp};display:flex;align-items:center;gap:6px">
           ${svgIcon(ICONS.swap,14,isNight?"#8AAAC8":T.blue)} החלף
         </button>
-        <button data-action="toggle-night" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:6px;color:${tp};font-family:inherit;font-weight:700;font-size:12px">
-          ${svgIcon(isNight?ICONS.sun:ICONS.moon,14,isNight?"#FFD166":T.blue)}${isNight?"יום":"לילה"}
-        </button>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="sync-dot" class="sync-dot ${state.syncStatus}"></span>
+          <button data-action="toggle-night" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:6px;color:${tp};font-family:inherit;font-weight:700;font-size:12px">
+            ${svgIcon(isNight?ICONS.sun:ICONS.moon,14,isNight?"#FFD166":T.blue)}${isNight?"יום":"לילה"}
+          </button>
+        </div>
       </div>
 
       <div style="${C("margin-bottom:14px;")}">
@@ -416,12 +471,10 @@ function renderDashboard(){
                 <input id="dob-edit-input" type="date" value="${state.dobInput}" style="padding:6px 10px;border-radius:6px;border:1.5px solid ${T.blue};font-size:12px;font-family:inherit;flex:1"/>
                 <button data-action="save-dob" style="background:${T.blue};color:#fff;border:none;border-radius:6px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✓</button>
                 <button data-action="cancel-dob" style="background:#fff;color:${T.muted};border:1.5px solid ${T.muted};border-radius:6px;padding:6px 8px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✕</button>
-              </div>
-            `:`
+              </div>`:`
               <button data-action="edit-dob" style="background:none;border:none;padding:0;margin-top:3px;cursor:pointer;display:flex;align-items:center;gap:4px;color:${ts};font-size:11px;font-family:inherit">
                 ${svgIcon(ICONS.edit,11,ts)}${baby.dob?new Date(baby.dob).toLocaleDateString("he-IL"):"הוסף תאריך לידה"}
-              </button>
-            `}
+              </button>`}
           </div>
         </div>
         <div style="font-size:11px;color:${ts};margin-top:10px;padding-top:10px;border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":"#E4EFF8"}">${fmtDate(Date.now())}</div>
@@ -430,45 +483,58 @@ function renderDashboard(){
 
     <div style="padding:0 14px">${tabContent}</div>
 
-    <div style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"#0D1B2A":"#fff"};border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":T.blueLight};display:flex;justify-content:space-around;padding:8px 0 18px;z-index:50">
-      ${[
-        {id:"home",icon:ICONS.home,label:"בית"},
-        {id:"charts",icon:ICONS.chart,label:"גרפים"},
-        {id:"history",icon:ICONS.history,label:"היסטוריה"},
-      ].map(t=>`
+    <div style="position:fixed;bottom:0;left:50%;transform:translateX(50%);width:100%;max-width:480px;background:${isNight?"#0D1B2A":"#fff"};border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":T.blueLight};display:flex;justify-content:space-around;padding:8px 0 18px;z-index:50">
+      ${[{id:"home",icon:ICONS.home,label:"בית"},{id:"charts",icon:ICONS.chart,label:"גרפים"},{id:"history",icon:ICONS.history,label:"היסטוריה"}].map(t=>`
         <button data-action="set-tab" data-tab="${t.id}" style="background:none;border:none;cursor:pointer;font-family:inherit;text-align:center;padding:4px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:${state.tab===t.id?1:0.32}">
           ${svgIcon(t.icon,21,state.tab===t.id?T.blue:tp)}
           <div style="font-size:10px;font-weight:700;color:${tp}">${t.label}</div>
         </button>
       `).join("")}
     </div>
-    ${modalHTML}
+    ${state.modal?renderModal(state.modal,isNight):""}
   </div>`;
 }
 
-function renderLogItem(l,ts,catIcons){
+function renderLogItem(l,catIcons){
   const c=CAT[l.type];
   const feedLabel=FEED_TYPES.find(f=>f.value===l.subtype)?.label;
   const diaperLabel=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label;
   let detail="";
-  if(feedLabel) detail+=feedLabel;
-  if(diaperLabel) detail+=diaperLabel;
-  if(l.medName) detail+=l.medName+(l.medDose?" · "+l.medDose:"");
-  if(l.ml) detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
-  else if(l.amount) detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
-  if(l.durationMs>0) detail+=" · "+dur(l.durationMs);
-  if(l.note) detail+=" · "+l.note;
-  return `
+  if(feedLabel)detail+=feedLabel;
+  if(diaperLabel)detail+=diaperLabel;
+  if(l.medName)detail+=l.medName+(l.medDose?" · "+l.medDose:"");
+  if(l.ml)detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
+  else if(l.amount)detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
+  if(l.durationMs>0)detail+=" · "+dur(l.durationMs);
+  if(l.note)detail+=" · "+l.note;
+
+  const isEditing=state.editingTimeId===String(l.id);
+  const dateStr=new Date(l.ts).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"});
+
+  const timeCol=isEditing?`
+    <div style="flex-shrink:0;min-width:120px">
+      <input id="time-edit-${l.id}" type="datetime-local"
+        value="${new Date(l.ts-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"
+        style="font-size:11px;border:1.5px solid ${c.accent};border-radius:6px;padding:4px 6px;font-family:inherit;width:120px;outline:none"/>
+      <div style="display:flex;gap:4px;margin-top:4px">
+        <button data-action="save-time" data-id="${l.id}" style="flex:1;background:${c.accent};color:#fff;border:none;border-radius:5px;padding:4px 0;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer">✓</button>
+        <button data-action="cancel-time" style="flex:1;background:#f0f0f0;color:${T.muted};border:none;border-radius:5px;padding:4px 0;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer">✕</button>
+      </div>
+    </div>`:`
+    <div style="text-align:center;flex-shrink:0;min-width:48px;cursor:pointer" data-action="edit-time" data-id="${l.id}">
+      <div style="font-size:12px;font-weight:800;color:${c.accent}">${fmtTime(l.ts)}</div>
+      <div style="font-size:9px;color:${T.muted}">${dateStr}</div>
+      <div style="font-size:9px;color:${c.accent};opacity:0.6">✏️</div>
+    </div>`;
+
+  return`
     <div style="display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:8px;background:${c.bg};margin-bottom:6px;border:1px solid ${c.border}">
       <div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px;border:1px solid ${c.border}">${svgIcon(catIcons[l.type]||ICONS.note,16,c.accent)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:12px;color:${c.accent}">${c.label}</div>
         <div style="font-size:11px;color:${T.slate};margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${detail}</div>
       </div>
-      <div style="text-align:center;flex-shrink:0;min-width:48px">
-        <div style="font-size:12px;font-weight:800;color:${c.accent}">${fmtTime(l.ts)}</div>
-        <div style="font-size:9px;color:${T.muted}">${new Date(l.ts).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"})}</div>
-      </div>
+      ${timeCol}
       <button data-action="delete-log" data-id="${l.id}" style="background:rgba(255,255,255,0.8);border:1px solid ${c.border};border-radius:6px;width:28px;height:28px;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:${T.muted}">✕</button>
     </div>`;
 }
@@ -478,58 +544,33 @@ function renderCharts(logs,isNight,ts,C){
     const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-6+i);
     const n=new Date(d);n.setDate(n.getDate()+1);
     const dl=logs.filter(l=>l.ts>=d.getTime()&&l.ts<n.getTime());
-    return{
-      day:d.toLocaleDateString("he-IL",{weekday:"short"}),
-      ml:dl.filter(l=>l.type==="feed").reduce((s,l)=>s+(Number(l.ml)||0),0),
-      hrs:+(dl.filter(l=>l.type==="sleep").reduce((s,l)=>s+(l.durationMs||0),0)/3600000).toFixed(1),
-      diapers:dl.filter(l=>l.type==="diaper").length
-    };
+    return{day:d.toLocaleDateString("he-IL",{weekday:"short"}),ml:dl.filter(l=>l.type==="feed").reduce((s,l)=>s+(Number(l.ml)||0),0),hrs:+(dl.filter(l=>l.type==="sleep").reduce((s,l)=>s+(l.durationMs||0),0)/3600000).toFixed(1),diapers:dl.filter(l=>l.type==="diaper").length};
   });
-  const charts=[
+  return[
     {key:"ml",label:'מ״ל האכלה',unit:'מ"ל',color:T.blue,type:"bar",icon:ICONS.bottle},
     {key:"hrs",label:"שעות שינה",unit:"שע׳",color:"#5B6FA6",type:"line",icon:ICONS.moon},
     {key:"diapers",label:"חיתולים",unit:"",color:T.teal,type:"bar",icon:ICONS.diaper},
-  ];
-  return charts.map(ch=>{
+  ].map(ch=>{
     const data=last7.map(d=>({day:d.day,val:d[ch.key]}));
     const max=Math.max(...data.map(d=>d.val),1);
-    const W=300,H=88,gap=4;
-    const bw=(W-gap*(data.length+1))/data.length;
-    let chartSvg="";
+    const W=300,H=88,gap=4,bw=(W-gap*(data.length+1))/data.length;
+    let svg="";
     if(ch.type==="bar"){
-      chartSvg=data.map((d,i)=>{
-        const bh=Math.max((d.val/max)*H,d.val>0?3:0);
-        const x=gap+i*(bw+gap),y=H-bh;
-        return `<rect x="${x}" y="${d.val>0?y:H}" width="${bw}" height="${d.val>0?bh:2}" rx="3" fill="${d.val>0?ch.color:"#E0EDF7"}"/>
+      svg=data.map((d,i)=>{
+        const bh=Math.max((d.val/max)*H,d.val>0?3:0),x=gap+i*(bw+gap),y=H-bh;
+        return`<rect x="${x}" y="${d.val>0?y:H}" width="${bw}" height="${d.val>0?bh:2}" rx="3" fill="${d.val>0?ch.color:"#E0EDF7"}"/>
           ${d.val>0?`<text x="${x+bw/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${d.val}</text>`:""}
           <text x="${x+bw/2}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${d.day}</text>`;
       }).join("");
-    } else {
-      const padX=14;
-      const pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:H-(d.val/max)*H,val:d.val,day:d.day}));
-      const path=pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
-      chartSvg=`<path d="${path}" fill="none" stroke="${ch.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-      chartSvg+=pts.map((p,i)=>`
-        <circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>
-        ${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}
-        <text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>
-      `).join("");
+    }else{
+      const padX=14,pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:H-(d.val/max)*H,val:d.val,day:d.day}));
+      svg=`<path d="${pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")}" fill="none" stroke="${ch.color}" stroke-width="2" stroke-linejoin="round"/>`;
+      svg+=pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}<text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>`).join("");
     }
-    return `
-      <div style="${C()}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:6px">
-            ${svgIcon(ch.icon,14,isNight?"rgba(255,255,255,0.5)":T.muted)}
-            <span style="font-size:12px;font-weight:700;color:${ts}">${ch.label} — 7 ימים</span>
-          </div>
-          <span style="font-size:13px;font-weight:800;color:${ch.color}">${last7[6][ch.key]} ${ch.unit} היום</span>
-        </div>
-        <svg viewBox="0 0 ${W} ${H+24}" style="width:100%">${chartSvg}</svg>
-      </div>`;
+    return`<div style="${C()}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="display:flex;align-items:center;gap:6px">${svgIcon(ch.icon,14,isNight?"rgba(255,255,255,0.5)":T.muted)}<span style="font-size:12px;font-weight:700;color:${ts}">${ch.label} — 7 ימים</span></div><span style="font-size:13px;font-weight:800;color:${ch.color}">${last7[6][ch.key]} ${ch.unit} היום</span></div><svg viewBox="0 0 ${W} ${H+24}" style="width:100%">${svg}</svg></div>`;
   }).join("");
 }
 
-// ── Modal ──────────────────────────────────────────────────────────────────
 function renderModal(type,isNight){
   const c=CAT[type];
   const catIcon={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
@@ -537,9 +578,7 @@ function renderModal(type,isNight){
   if(type==="feed"){
     inner=`
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-        ${FEED_TYPES.map(f=>`
-          <button data-action="set-feed-type" data-val="${f.value}" style="padding:10px 13px;border-radius:6px;border:1.5px solid ${state.feedType===f.value?c.accent:"#C8DAE8"};background:${state.feedType===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${state.feedType===f.value?c.accent:T.slate}">${f.label}</button>
-        `).join("")}
+        ${FEED_TYPES.map(f=>`<button data-action="set-feed-type" data-val="${f.value}" style="padding:10px 13px;border-radius:6px;border:1.5px solid ${state.feedType===f.value?c.accent:"#C8DAE8"};background:${state.feedType===f.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;color:${state.feedType===f.value?c.accent:T.slate}">${f.label}</button>`).join("")}
       </div>
       ${state.feedType.includes("breast")?`
         <div style="background:${c.bg};border-radius:8px;padding:16px;text-align:center;margin-bottom:14px;border:1px solid ${c.accent}30">
@@ -549,11 +588,9 @@ function renderModal(type,isNight){
             ${state.feedRunning?`<button data-action="feed-timer-pause" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:9px 22px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">⏸ השהה</button>`:""}
             ${!state.feedRunning&&state.feedStart?`
               <button data-action="feed-timer-resume" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">▶ המשך</button>
-              <button data-action="feed-timer-done" style="background:#fff;color:${c.accent};border:1.5px solid ${c.accent};border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">✓ סיים</button>
-            `:""}
+              <button data-action="feed-timer-done" style="background:#fff;color:${c.accent};border:1.5px solid ${c.accent};border-radius:6px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">✓ סיים</button>`:""}
           </div>
-        </div>
-      `:""}
+        </div>`:""}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div>
           <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${state.feedType.includes("breast")?"משך (דק׳)":"כמות (מ״ל)"}</label>
@@ -567,14 +604,9 @@ function renderModal(type,isNight){
       <div style="background:${c.bg};border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:${c.accent};font-weight:700;border:1px solid ${c.border};display:flex;align-items:center;gap:6px">
         ${svgIcon(ICONS.clock,13,c.accent)} שעת האכלה: ${new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}
       </div>`;
-  } else if(type==="diaper"){
-    inner=`
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        ${DIAPER_TYPES.map(d=>`
-          <button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center">${d.label}</button>
-        `).join("")}
-      </div>`;
-  } else if(type==="sleep"){
+  }else if(type==="diaper"){
+    inner=`<div style="display:flex;gap:8px;margin-bottom:16px">${DIAPER_TYPES.map(d=>`<button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center">${d.label}</button>`).join("")}</div>`;
+  }else if(type==="sleep"){
     inner=`
       <div style="text-align:center;margin-bottom:20px">
         <div style="display:flex;justify-content:center;margin-bottom:14px">${bearSVG(state.sleeping||!!state.sleepStart,64)}</div>
@@ -589,7 +621,7 @@ function renderModal(type,isNight){
           <button data-action="sleep-start" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%">▶ התחל להקליט שינה</button>
         `}
       </div>`;
-  } else if(type==="med"){
+  }else if(type==="med"){
     inner=`
       <div style="margin-bottom:14px">
         <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">שם התרופה / ויטמין</label>
@@ -598,17 +630,16 @@ function renderModal(type,isNight){
         <input id="modal-med-dose" value="${state.medDose}" placeholder='למשל: 1 מ"ל' style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
       </div>`;
   }
-
-  return `
+  return`
     <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:#F7FBFF;border-radius:14px 14px 0 0;width:100%;max-width:500px;direction:rtl;font-family:'Nunito',sans-serif;max-height:92vh;overflow-y:auto">
+      <div style="background:#F7FBFF;border-radius:14px 14px 0 0;width:100%;max-width:500px;direction:rtl;max-height:92vh;overflow-y:auto">
         <div style="background:${c.bg};border-radius:14px 14px 0 0;padding:16px 18px 14px;border-bottom:1px solid ${c.border}">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div style="display:flex;align-items:center;gap:10px">
               <div style="background:#fff;border-radius:6px;padding:7px;border:1px solid ${c.border}">${svgIcon(catIcon[type],20,c.accent)}</div>
               <span style="font-size:17px;font-weight:800;color:${c.accent}">${c.label}</span>
             </div>
-            <button data-action="close-modal" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:32px;height:32px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:${T.muted}">✕</button>
+            <button data-action="close-modal" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:${T.muted};font-size:15px">✕</button>
           </div>
         </div>
         <div style="padding:18px 18px 40px">
@@ -622,97 +653,103 @@ function renderModal(type,isNight){
     </div>`;
 }
 
-function fmtFeedTimer(ms){
-  const s=Math.floor(ms/1000);
-  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
-}
+function fmtFeedTimer(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
 
 // ── Events ─────────────────────────────────────────────────────────────────
 function attachEvents(){
-  document.querySelectorAll("[data-action]").forEach(el=>{
-    el.addEventListener("click",handleAction);
-  });
-  // live input sync
-  const nameInput=document.getElementById("new-baby-name");
-  if(nameInput) nameInput.addEventListener("input",e=>state.newBabyName=e.target.value);
-  const dobInput=document.getElementById("new-baby-dob");
-  if(dobInput) dobInput.addEventListener("input",e=>state.newBabyDob=e.target.value);
-  const dobEdit=document.getElementById("dob-edit-input");
-  if(dobEdit) dobEdit.addEventListener("input",e=>state.dobInput=e.target.value);
-  const restoreFile=document.getElementById("restore-file");
-  if(restoreFile) restoreFile.addEventListener("change",handleRestore);
+  document.querySelectorAll("[data-action]").forEach(el=>el.addEventListener("click",handleAction));
+  const ni=document.getElementById("new-baby-name");if(ni)ni.addEventListener("input",e=>state.newBabyName=e.target.value);
+  const di=document.getElementById("new-baby-dob");if(di)di.addEventListener("input",e=>state.newBabyDob=e.target.value);
+  const de=document.getElementById("dob-edit-input");if(de)de.addEventListener("input",e=>state.dobInput=e.target.value);
 }
 
 function handleAction(e){
-  const el=e.currentTarget;
-  const action=el.dataset.action;
+  const el=e.currentTarget,action=el.dataset.action;
+
+  if(action==="sync-refresh"){init();return;}
 
   if(action==="select-baby"){
     const baby=state.babies.find(b=>b.id===el.dataset.id);
-    if(!baby) return;
-    setState({screen:"dashboard",selectedBaby:baby,logs:store.getLogs(baby.id),tab:"home",modal:null,isNight:null,dobInput:baby.dob||""});
+    if(!baby)return;
+    setState({screen:"dashboard",selectedBaby:baby,logs:[],tab:"home",modal:null,isNight:null,dobInput:baby.dob||"",syncStatus:"busy"});
+    sb.getLogs(baby.id).then(rows=>{
+      const logs=rows.map(rowToLog);
+      store.saveLogs(baby.id,logs);
+      setState({logs,syncStatus:"ok"});
+    }).catch(()=>{
+      setState({logs:store.getLogs(baby.id),syncStatus:"err"});
+    });
   }
   else if(action==="delete-baby"){
-    if(!confirm("למחוק תינוק זה?")) return;
-    const babies=state.babies.filter(b=>b.id!==el.dataset.id);
-    store.saveBabies(babies);
-    setState({babies});
+    if(!confirm("למחוק תינוק זה וכל הנתונים שלו?"))return;
+    const id=el.dataset.id;
+    setSyncStatus("busy");
+    sb.deleteLogs(id).then(()=>sb.deleteBaby(id)).then(()=>{
+      const babies=state.babies.filter(b=>b.id!==id);
+      store.saveBabies(babies);
+      setState({babies,syncStatus:"ok"});
+    }).catch(()=>{
+      const babies=state.babies.filter(b=>b.id!==id);
+      store.saveBabies(babies);
+      setState({babies,syncStatus:"err"});
+    });
   }
-  else if(action==="start-add") setState({addingBaby:true});
-  else if(action==="cancel-add") setState({addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:""});
-  else if(action==="pick-emoji") setState({newBabyEmoji:el.dataset.emoji});
+  else if(action==="start-add")setState({addingBaby:true});
+  else if(action==="cancel-add")setState({addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:""});
+  else if(action==="pick-emoji")setState({newBabyEmoji:el.dataset.emoji});
   else if(action==="confirm-add"){
-    if(!state.newBabyName.trim()) return;
+    if(!state.newBabyName.trim())return;
     const baby={id:Date.now().toString(),name:state.newBabyName.trim(),emoji:state.newBabyEmoji,dob:state.newBabyDob,createdAt:Date.now()};
     const babies=[...state.babies,baby];
     store.saveBabies(babies);
-    setState({babies,screen:"dashboard",selectedBaby:baby,logs:[],tab:"home",modal:null,isNight:null,addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:"",dobInput:baby.dob||""});
+    setState({babies,screen:"dashboard",selectedBaby:baby,logs:[],tab:"home",modal:null,isNight:null,addingBaby:false,newBabyName:"",newBabyEmoji:"☁️",newBabyDob:"",dobInput:baby.dob||"",syncStatus:"busy"});
+    sb.upsertBaby(babyToRow(baby)).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
-  else if(action==="backup") backupAll(state.babies);
-  else if(action==="restore-click") document.getElementById("restore-file").click();
-  else if(action==="go-back") setState({screen:"selector",selectedBaby:null,logs:[],modal:null});
+  else if(action==="go-back"){clearInterval(sleepTimer);clearInterval(feedTimer);setState({screen:"selector",selectedBaby:null,logs:[],modal:null});}
   else if(action==="toggle-night"){
     const autoNight=new Date().getHours()>=21||new Date().getHours()<6;
-    const cur=state.isNight!==null?state.isNight:autoNight;
-    setState({isNight:!cur});
+    setState({isNight:!(state.isNight!==null?state.isNight:autoNight)});
   }
-  else if(action==="set-tab") setState({tab:el.dataset.tab});
+  else if(action==="set-tab")setState({tab:el.dataset.tab});
   else if(action==="open-modal"){
     clearInterval(sleepTimer);clearInterval(feedTimer);
     setState({modal:el.dataset.type,feedType:"breast_left",amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
   }
   else if(action==="close-modal"){clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});}
-  else if(action==="save-log") saveLog();
+  else if(action==="save-log")saveLog();
   else if(action==="delete-log"){
-    const logs=state.logs.filter(l=>String(l.id)!==el.dataset.id);
+    const lid=el.dataset.id;
+    const logs=state.logs.filter(l=>String(l.id)!==lid);
     store.saveLogs(state.selectedBaby.id,logs);
-    setState({logs});
+    setState({logs,syncStatus:"busy"});
+    sb.deleteLog(lid).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
-  else if(action==="export-csv") exportCSV(state.logs,state.selectedBaby.name);
+  else if(action==="export-csv")exportCSV(state.logs,state.selectedBaby.name);
   else if(action==="clear-logs"){
-    if(!confirm("למחוק את כל הנתונים?")) return;
+    if(!confirm("למחוק את כל הנתונים?"))return;
     store.saveLogs(state.selectedBaby.id,[]);
-    setState({logs:[]});
+    setState({logs:[],syncStatus:"busy"});
+    sb.deleteLogs(state.selectedBaby.id).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
-  else if(action==="edit-dob") setState({editDob:true,dobInput:state.selectedBaby.dob||""});
-  else if(action==="cancel-dob") setState({editDob:false});
+  else if(action==="edit-dob")setState({editDob:true,dobInput:state.selectedBaby.dob||""});
+  else if(action==="cancel-dob")setState({editDob:false});
   else if(action==="save-dob"){
     const baby={...state.selectedBaby,dob:state.dobInput};
     const babies=state.babies.map(b=>b.id===baby.id?baby:b);
     store.saveBabies(babies);
-    setState({selectedBaby:baby,babies,editDob:false});
+    setState({selectedBaby:baby,babies,editDob:false,syncStatus:"busy"});
+    sb.upsertBaby(babyToRow(baby)).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
-  else if(action==="set-feed-type") setState({feedType:el.dataset.val,feedRunning:false,feedStart:null,feedEl:0,timerMs:null});
+  else if(action==="set-feed-type")setState({feedType:el.dataset.val,feedRunning:false,feedStart:null,feedEl:0,timerMs:null});
   else if(action==="feed-timer-start"){
-    const s=Date.now();
-    state.feedStart=s;state.feedRunning=true;
+    const s=Date.now();state.feedStart=s;state.feedRunning=true;
     clearInterval(feedTimer);
     feedTimer=setInterval(()=>setState({feedEl:Date.now()-state.feedStart}),1000);
     setState({feedRunning:true});
   }
   else if(action==="feed-timer-pause"){clearInterval(feedTimer);setState({feedRunning:false});}
   else if(action==="feed-timer-resume"){
-    const offset=state.feedEl;const now=Date.now();
+    const offset=state.feedEl,now=Date.now();
     state.feedStart=now-offset;
     clearInterval(feedTimer);
     feedTimer=setInterval(()=>setState({feedEl:Date.now()-state.feedStart}),1000);
@@ -724,64 +761,98 @@ function handleAction(e){
     setState({feedRunning:false,timerMs:ms,amount:String(Math.round(ms/60000))});
   }
   else if(action==="sleep-start"){
-    const s=Date.now();
-    state.sleepStart=s;
+    const s=Date.now();state.sleepStart=s;
     clearInterval(sleepTimer);
     sleepTimer=setInterval(()=>setState({elapsed:Date.now()-state.sleepStart}),1000);
     setState({sleeping:true});
   }
-  else if(action==="sleep-stop"){
-    clearInterval(sleepTimer);
-    setState({sleeping:false});
+  else if(action==="sleep-stop"){clearInterval(sleepTimer);setState({sleeping:false});}
+  else if(action==="edit-time")setState({editingTimeId:el.dataset.id});
+  else if(action==="cancel-time")setState({editingTimeId:null});
+  else if(action==="save-time"){
+    const lid=el.dataset.id;
+    const input=document.getElementById("time-edit-"+lid);
+    if(!input)return;
+    const newTs=new Date(input.value).getTime();
+    if(isNaN(newTs))return;
+    const logs=state.logs.map(l=>String(l.id)===lid?{...l,ts:newTs}:l);
+    store.saveLogs(state.selectedBaby.id,logs);
+    setState({logs,editingTimeId:null,syncStatus:"busy"});
+    const updated=logs.find(l=>String(l.id)===lid);
+    if(updated)sb.upsertLog(logToRow(updated,state.selectedBaby.id)).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
-  else if(action==="set-diaper-type") setState({diaperType:el.dataset.val});
 }
 
 function saveLog(){
-  // read inputs
   const amtEl=document.getElementById("modal-amount");
   const mlEl=document.getElementById("modal-ml");
   const noteEl=document.getElementById("modal-note");
   const medNameEl=document.getElementById("modal-med-name");
   const medDoseEl=document.getElementById("modal-med-dose");
-  if(amtEl) state.amount=amtEl.value;
-  if(mlEl) state.ml=mlEl.value;
-  if(noteEl) state.note=noteEl.value;
-  if(medNameEl) state.medName=medNameEl.value;
-  if(medDoseEl) state.medDose=medDoseEl.value;
+  if(amtEl)state.amount=amtEl.value;
+  if(mlEl)state.ml=mlEl.value;
+  if(noteEl)state.note=noteEl.value;
+  if(medNameEl)state.medName=medNameEl.value;
+  if(medDoseEl)state.medDose=medDoseEl.value;
 
-  const base={type:state.modal,ts:Date.now(),note:state.note,id:Date.now()+Math.random()};
+  if(state.modal==="sleep"&&!state.sleepStart&&!state.elapsed){alert("לחץ על 'התחל להקליט שינה' קודם");return;}
+
+  const id=String(Date.now()+Math.random());
+  const base={type:state.modal,ts:Date.now(),note:state.note,id};
   let log;
-  if(state.modal==="feed") log={...base,subtype:state.feedType,amount:state.amount?Number(state.amount):null,ml:state.ml?Number(state.ml):null,durationMs:state.timerMs||null};
-  else if(state.modal==="diaper") log={...base,subtype:state.diaperType};
-  else if(state.modal==="sleep") log={...base,subtype:"tracked",durationMs:state.sleepStart?Date.now()-state.sleepStart:0};
-  else if(state.modal==="med") log={...base,medName:state.medName,medDose:state.medDose};
+  if(state.modal==="feed")log={...base,subtype:state.feedType,amount:state.amount?Number(state.amount):null,ml:state.ml?Number(state.ml):null,durationMs:state.timerMs||null};
+  else if(state.modal==="diaper")log={...base,subtype:state.diaperType};
+  else if(state.modal==="sleep"){
+    const finalMs=state.sleeping?Date.now()-state.sleepStart:state.elapsed;
+    clearInterval(sleepTimer);
+    log={...base,subtype:"tracked",durationMs:finalMs};
+  }
+  else if(state.modal==="med")log={...base,medName:state.medName,medDose:state.medDose};
   else log=base;
 
-  clearInterval(sleepTimer);clearInterval(feedTimer);
+  clearInterval(feedTimer);
   const logs=[log,...state.logs];
   store.saveLogs(state.selectedBaby.id,logs);
-  setState({logs,modal:null,sleeping:false,sleepStart:null,elapsed:0,feedRunning:false,feedStart:null,feedEl:0});
+  setState({logs,modal:null,sleeping:false,sleepStart:null,elapsed:0,feedRunning:false,feedStart:null,feedEl:0,syncStatus:"busy"});
+
+  sb.upsertLog(logToRow(log,state.selectedBaby.id))
+    .then(()=>setSyncStatus("ok"))
+    .catch(()=>setSyncStatus("err"));
 }
 
-function handleRestore(e){
-  const file=e.target.files[0];
-  if(!file) return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    try{
-      const d=JSON.parse(ev.target.result);
-      if(!d.babies||!d.logs) return alert("קובץ לא תקין");
-      store.saveBabies(d.babies);
-      Object.entries(d.logs).forEach(([id,l])=>store.saveLogs(id,l));
-      setState({babies:d.babies});
-    }catch{alert("שגיאה בקריאת הקובץ");}
-  };
-  r.readAsText(file);
-}
+// ── Start ──────────────────────────────────────────────────────────────────
+init();
 
-// ── Init ───────────────────────────────────────────────────────────────────
-render();
+// ── PWA Service Worker + Install Banner ───────────────────────────────────
+let _deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault();
+  _deferredPrompt=e;
+  showInstallBanner();
+});
+function showInstallBanner(){
+  if(localStorage.getItem("bt_install_dismissed"))return;
+  const b=document.createElement("div");
+  b.id="install-banner";
+  b.style.cssText="position:fixed;bottom:90px;left:50%;transform:translateX(50%);width:calc(100% - 28px);max-width:452px;background:#2C6BAC;color:#fff;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-family:'Nunito',sans-serif;direction:rtl";
+  b.innerHTML=`<span style="font-size:26px">🍼</span><div style="flex:1"><div style="font-weight:800;font-size:14px">Baby Tracker</div><div style="font-size:12px;opacity:0.85">הוסף למסך הבית לגישה מהירה</div></div><button onclick="doInstall()" style="background:#fff;color:#2C6BAC;border:none;border-radius:8px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer">התקן</button><button onclick="dismissInstall()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px">✕</button>`;
+  document.body.appendChild(b);
+}
+function doInstall(){
+  if(!_deferredPrompt)return;
+  _deferredPrompt.prompt();
+  _deferredPrompt.userChoice.then(()=>{_deferredPrompt=null;dismissInstall();});
+}
+function dismissInstall(){
+  localStorage.setItem("bt_install_dismissed","1");
+  const b=document.getElementById("install-banner");
+  if(b)b.remove();
+}
+if("serviceWorker" in navigator){
+  const sw=`const C="bt-v1";self.addEventListener("install",e=>e.waitUntil(caches.open(C).then(c=>c.add("/"))));self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;
+  const blob=new Blob([sw],{type:"application/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
 </script>
 </body>
 </html>
