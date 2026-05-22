@@ -656,15 +656,24 @@ function renderModal(type,isNight){
 function fmtFeedTimer(ms){const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");}
 
 // ── Events ─────────────────────────────────────────────────────────────────
+let _eventsAttached=false;
 function attachEvents(){
-  document.querySelectorAll("[data-action]").forEach(el=>el.addEventListener("click",handleAction));
+  // attach global delegation once only
+  if(!_eventsAttached){
+    document.addEventListener("click",e=>{
+      const el=e.target.closest("[data-action]");
+      if(el)handleAction(e,el);
+    });
+    _eventsAttached=true;
+  }
   const ni=document.getElementById("new-baby-name");if(ni)ni.addEventListener("input",e=>state.newBabyName=e.target.value);
   const di=document.getElementById("new-baby-dob");if(di)di.addEventListener("input",e=>state.newBabyDob=e.target.value);
   const de=document.getElementById("dob-edit-input");if(de)de.addEventListener("input",e=>state.dobInput=e.target.value);
 }
 
-function handleAction(e){
-  const el=e.currentTarget,action=el.dataset.action;
+function handleAction(e,el){
+  el=el||e.currentTarget;
+  const action=el.dataset.action;
 
   if(action==="sync-refresh"){init();return;}
 
