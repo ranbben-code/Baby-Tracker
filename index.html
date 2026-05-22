@@ -255,10 +255,21 @@ function exportCSV(logs,name){
 }
 
 function exportToSheets(logs,name){
-  // Build CSV and open in Google Sheets import
-  const rows=[["שם","סוג","פירוט","מ״ל","כמות/משך","שעה","תאריך","הערה"]];
+  const rows=[["שם","סוג","פירוט","מ״ל סה״כ","כמות/משך","שעה","תאריך","הערה"]];
   logs.forEach(l=>{
-    const feedLabel=l.subtype?l.subtype.split(",").map(s=>FEED_TYPES.find(f=>f.value===s)?.label||s).join(" + "):"";
+    if(l.type==="feed"&&l.subtype){
+      const types=l.subtype.split(",").filter(Boolean);
+      if(types.length>1){
+        // row per type
+        types.forEach(t=>{
+          const ft=FEED_TYPES.find(f=>f.value===t);
+          const m=l.mlByType?.[t]||"";
+          rows.push([name,"האכלה",ft?.label||t,m,"",new Date(l.ts).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"}),new Date(l.ts).toLocaleDateString("he-IL"),l.note||""]);
+        });
+        return;
+      }
+    }
+    const feedLabel=l.subtype?l.subtype.split(",").map(s=>FEED_TYPES.find(f=>f.value===s)?.label||s).join("+"):"";
     const diaperLabel=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label||"";
     rows.push([
       name,
@@ -272,14 +283,10 @@ function exportToSheets(logs,name){
     ]);
   });
   const csv="\uFEFF"+rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
-  // Download CSV then open Google Sheets
-  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
-  a.href=url; a.download=name+".csv"; a.click();
-  setTimeout(()=>{
-    window.open("https://sheets.new","_blank");
-  },800);
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8;"}));
+  a.download=name+"-נתונים.csv"; a.click();
+  setTimeout(()=>window.open("https://sheets.new","_blank"),800);
 }
 
 // ── App State ──────────────────────────────────────────────────────────────
@@ -459,10 +466,13 @@ function renderDashboard(){
       <div style="${C()}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <div style="font-size:12px;font-weight:700;color:${ts};display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
-          <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-            Google Sheets
-          </button>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:#0F9D58;font-weight:700">הורד נתונים ←</span>
+            <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+              Sheets
+            </button>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           ${Object.entries(CAT).map(([type,c])=>`
@@ -560,30 +570,41 @@ function renderDashboard(){
 
 function renderLogItem(l,catIcons){
   const c=CAT[l.type];
-  const feedLabel=l.subtype?l.subtype.split(",").map(s=>FEED_TYPES.find(f=>f.value===s)?.label||s).join(" + "):"";
+  const types=l.type==="feed"&&l.subtype?l.subtype.split(",").filter(Boolean):[];
   const diaperLabel=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label;
-  let detail="";
-  if(feedLabel)detail+=feedLabel;
-  if(diaperLabel)detail+=diaperLabel;
-  if(l.medName)detail+=l.medName+(l.medDose?" · "+l.medDose:"");
-  // show per-type ml if available
-  if(l.mlByType&&Object.keys(l.mlByType).length>0){
-    const parts=Object.entries(l.mlByType).map(([t,m])=>{const ft=FEED_TYPES.find(f=>f.value===t);return`${ft?.label||t}: ${m} מ״ל`;});
-    detail+=` · <strong style="color:${c.accent}">${parts.join(" | ")}</strong>`;
-  } else if(l.ml){
-    detail+=` · <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
-  } else if(l.amount){
-    detail+=" · "+l.amount+(l.subtype?.includes("breast")?" דק׳":" מ״ל");
+
+  // Build detail lines
+  let detailLines=[];
+  if(l.type==="feed"){
+    if(types.length>1){
+      // one line per type
+      types.forEach(t=>{
+        const ft=FEED_TYPES.find(f=>f.value===t);
+        const m=l.mlByType?.[t];
+        detailLines.push(`<span style="display:block">${ft?.label||t}${m?` — <strong style="color:${c.accent}">${m} מ״ל</strong>`:""}</span>`);
+      });
+    } else {
+      const ft=types[0]?FEED_TYPES.find(f=>f.value===types[0]):null;
+      let line=ft?.label||"";
+      if(l.ml) line+=` — <strong style="color:${c.accent}">${l.ml} מ״ל</strong>`;
+      else if(l.amount) line+=` — ${l.amount}${types[0]?.includes("breast")?" דק׳":" מ״ל"}`;
+      if(line) detailLines.push(line);
+    }
+  } else if(diaperLabel){
+    detailLines.push(diaperLabel);
+  } else if(l.medName){
+    detailLines.push(l.medName+(l.medDose?` — ${l.medDose}`:""));
   }
-  if(l.durationMs>0)detail+=" · "+dur(l.durationMs);
-  if(l.note)detail+=" · "+l.note;
+  if(l.durationMs>0) detailLines.push(dur(l.durationMs));
+  if(l.note) detailLines.push(`<em>${l.note}</em>`);
+
   const dateStr=new Date(l.ts).toLocaleDateString("he-IL",{day:"numeric",month:"numeric"});
   return`
     <div style="display:flex;align-items:flex-start;gap:9px;padding:10px 11px;border-radius:8px;background:${c.bg};margin-bottom:6px;border:1px solid ${c.border}">
       <div style="flex-shrink:0;background:#fff;border-radius:6px;padding:6px;border:1px solid ${c.border};margin-top:2px">${svgIcon(catIcons[l.type]||ICONS.note,16,c.accent)}</div>
-      <div style="flex:1;min-width:0">
+      <div data-action="view-log" data-id="${l.id}" style="flex:1;min-width:0;cursor:pointer">
         <div style="font-weight:700;font-size:12px;color:${c.accent}">${c.label}</div>
-        <div style="font-size:11px;color:${T.slate};margin-top:2px;word-break:break-word;line-height:1.5">${detail}</div>
+        <div style="font-size:11px;color:${T.slate};margin-top:2px;line-height:1.6">${detailLines.join("")}</div>
       </div>
       <div style="text-align:center;flex-shrink:0;min-width:40px">
         <div style="font-size:12px;font-weight:800;color:${c.accent}">${fmtTime(l.ts)}</div>
@@ -593,6 +614,59 @@ function renderLogItem(l,catIcons){
       <button data-action="delete-log" data-id="${l.id}" style="background:rgba(255,255,255,0.8);border:1px solid ${c.border};border-radius:6px;width:28px;height:28px;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:${T.muted}">✕</button>
     </div>`;
 }
+
+function showLogView(l){
+  const c=CAT[l.type];
+  const types=l.type==="feed"&&l.subtype?l.subtype.split(",").filter(Boolean):[];
+  const diaperLabel=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label;
+  let rows=[];
+  if(l.type==="feed"){
+    if(types.length>1){
+      types.forEach(t=>{
+        const ft=FEED_TYPES.find(f=>f.value===t);
+        const m=l.mlByType?.[t];
+        rows.push({k:ft?.label||t,v:m?`${m} מ״ל`:"—"});
+      });
+      if(l.ml) rows.push({k:"סה״כ",v:`${l.ml} מ״ל`});
+    } else {
+      const ft=types[0]?FEED_TYPES.find(f=>f.value===types[0]):null;
+      if(ft) rows.push({k:"סוג",v:ft.label});
+      if(l.ml) rows.push({k:"כמות",v:`${l.ml} מ״ל`});
+      else if(l.amount) rows.push({k:"משך",v:`${l.amount} ${types[0]?.includes("breast")?"דק׳":"מ״ל"}`});
+    }
+  } else if(l.type==="diaper"){
+    rows.push({k:"סוג",v:diaperLabel||l.subtype});
+  } else if(l.type==="med"){
+    if(l.medName) rows.push({k:"תרופה",v:l.medName});
+    if(l.medDose) rows.push({k:"מינון",v:l.medDose});
+  } else if(l.type==="sleep"){
+    if(l.durationMs>0) rows.push({k:"משך",v:dur(l.durationMs)});
+  }
+  rows.push({k:"שעה",v:fmtTime(l.ts)});
+  rows.push({k:"תאריך",v:new Date(l.ts).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"})});
+  if(l.note) rows.push({k:"הערה",v:l.note});
+
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.5);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px";
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:320px;direction:rtl;font-family:'Nunito',sans-serif;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+      <div style="background:${c.bg};padding:14px 18px;border-bottom:1px solid ${c.border};display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:16px;font-weight:800;color:${c.accent}">${c.label}</span>
+        <button id="vl-close" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:${T.muted}">✕</button>
+      </div>
+      <div style="padding:16px 18px">
+        ${rows.map(r=>`
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid #f0f4f8">
+            <span style="font-size:12px;color:${T.muted};font-weight:700">${r.k}</span>
+            <span style="font-size:13px;font-weight:800;color:${T.slate}">${r.v}</span>
+          </div>`).join("")}
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById("vl-close").onclick=()=>ov.remove();
+  ov.addEventListener("click",e=>{if(e.target===ov)ov.remove();});
+}
+
 
 function renderEditModal(l){
   const c=CAT[l.type];
@@ -908,6 +982,9 @@ function attachEvents(){
       }
       const el=e.target.closest("[data-action]");
       if(el)handleAction(e,el);
+      // view-log on log body click
+      const vl=e.target.closest("[data-action='view-log']");
+      if(vl){const lid=vl.dataset.id;const log=state.logs.find(l=>String(l.id)===lid);if(log)showLogView(log);}
     });
     _eventsAttached=true;
   }
