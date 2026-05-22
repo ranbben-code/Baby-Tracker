@@ -84,7 +84,8 @@ function logToRow(l,babyId){
     duration_ms:l.durationMs||null,
     med_name:l.medName||null,
     med_dose:l.medDose||null,
-    note:l.note||null
+    note:l.note||null,
+    ml_by_type:l.mlByType||null
   };
 }
 function rowToLog(r){
@@ -98,7 +99,8 @@ function rowToLog(r){
     durationMs:r.duration_ms,
     medName:r.med_name,
     medDose:r.med_dose,
-    note:r.note
+    note:r.note,
+    mlByType:r.ml_by_type||null
   };
 }
 function babyToRow(b){
