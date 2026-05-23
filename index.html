@@ -304,15 +304,16 @@ function saveBabyPhoto(id,base64){ localStorage.setItem("bt_photo_"+id,base64); 
 
 function renderBabyAvatar(baby,size=58,clickable=false){
   const photo=getBabyPhoto(baby.id);
+  const click=clickable?`onclick="document.getElementById('photo-input').click()"`:""
   if(photo){
-    return`<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
+    return`<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0;cursor:${clickable?"pointer":"default"}" ${click}>
       <img src="${photo}" style="width:${size}px;height:${size}px;border-radius:10px;object-fit:cover;border:2px solid ${T.blueLight};display:block"/>
-      ${clickable?`<div data-action="pick-photo" style="position:absolute;bottom:0;right:0;background:${T.blue};border-radius:6px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px">✏️</div>`:""}
+      ${clickable?`<div style="position:absolute;bottom:0;right:0;background:${T.blue};border-radius:6px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;pointer-events:none">✏️</div>`:""}
     </div>`;
   }
-  return`<div data-action="${clickable?"pick-photo":""}" style="width:${size}px;height:${size}px;flex-shrink:0;background:${T.bluePale};border-radius:10px;border:${clickable?`2px dashed ${T.blueMid}`:`1px solid ${T.blueLight}`};display:flex;align-items:center;justify-content:center;cursor:${clickable?"pointer":"default"};position:relative">
-    ${bearSVG(false,size-14)}
-    ${clickable?`<div style="position:absolute;bottom:2px;right:2px;background:${T.blue};border-radius:5px;padding:2px 5px;font-size:9px;color:#fff;font-weight:700">הוסף תמונה</div>`:""}
+  return`<div style="width:${size}px;height:${size}px;flex-shrink:0;background:${T.bluePale};border-radius:10px;border:${clickable?`2px dashed ${T.blueMid}`:`1px solid ${T.blueLight}`};display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${clickable?"pointer":"default"};position:relative;overflow:hidden" ${click}>
+    ${bearSVG(false,size-16)}
+    ${clickable?`<div style="position:absolute;bottom:0;left:0;right:0;background:${T.blue};padding:3px 0;font-size:9px;color:#fff;font-weight:700;text-align:center;pointer-events:none">הוסף תמונה</div>`:""}
   </div>`;
 }
 let state={
@@ -1056,10 +1057,23 @@ function attachEvents(){
     if(!file||!state.selectedBaby)return;
     const reader=new FileReader();
     reader.onload=ev=>{
-      saveBabyPhoto(state.selectedBaby.id,ev.target.result);
-      render();
+      // compress image before saving
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement("canvas");
+        const max=300;
+        const ratio=Math.min(max/img.width,max/img.height,1);
+        canvas.width=img.width*ratio;
+        canvas.height=img.height*ratio;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        const compressed=canvas.toDataURL("image/jpeg",0.8);
+        saveBabyPhoto(state.selectedBaby.id,compressed);
+        setState({});// trigger re-render
+      };
+      img.src=ev.target.result;
     };
     reader.readAsDataURL(file);
+    e.target.value="";// reset so same file can be picked again
   });
 }
 
