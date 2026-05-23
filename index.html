@@ -474,24 +474,30 @@ function renderDashboard(){
   const allFeeds=[...logs].filter(l=>l.type==="feed").sort((a,b)=>Number(b.ts)-Number(a.ts));
   const lastFeed=allFeeds[0];
   const sinceMs=lastFeed?Date.now()-Number(lastFeed.ts):null;
-  const sinceLastFeed=sinceMs!==null?Math.floor(sinceMs/3600000):null;
+  const sinceHours=sinceMs!==null?Math.floor(sinceMs/3600000):null;
   const sinceMin=sinceMs!==null?Math.floor((sinceMs%3600000)/60000):null;
-  const sinceLabel=sinceLastFeed!==null
-    ?(sinceLastFeed>0?`${sinceLastFeed} שעות ו-${sinceMin} דקות`:`${sinceMin} דקות`)
-    :null;
-  const showFeedAlert=sinceMs!==null&&sinceMs>=2*3600000;
+  const sinceLabel=sinceMs===null?null
+    :sinceHours>0?`${sinceHours} שע׳ ו-${sinceMin} דק׳`
+    :`${sinceMin} דק׳`;
+  const alertStage=sinceMs===null?null:sinceMs>=4*3600000?"red":sinceMs>=2*3600000?"orange":"green";
+  const alertColors={
+    green:{bg:"#E8F5E9",border:"#A8DFC4",text:"#2E7D32",icon:"🟢",title:"זמן מהאכלה האחרונה"},
+    orange:{bg:"#FFF0E6",border:"#FFCBA4",text:"#FF8C42",icon:"🍼",title:"זמן להאכלה"},
+    red:{bg:"#FDEAEA",border:"#F5C0C0",text:"#E05A5A",icon:"⚠️",title:"כבר הרבה זמן לא האכלת!"},
+  };
+  const showFeedAlert=alertStage!==null;
 
   let tabContent="";
   if(state.tab==="home"){
     tabContent=`
       ${showFeedAlert?`
-        <div id="feed-alert" style="background:${sinceLastFeed>=4?"#FDEAEA":"#FFF0E6"};border:1.5px solid ${sinceLastFeed>=4?"#F5C0C0":"#FFCBA4"};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:22px">${sinceLastFeed>=4?"⚠️":"🍼"}</span>
+        <div id="feed-alert" style="background:${alertColors[alertStage].bg};border:1.5px solid ${alertColors[alertStage].border};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">${alertColors[alertStage].icon}</span>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:800;color:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"}">${sinceLastFeed>=4?"כבר הרבה זמן לא האכלת!":"זמן להאכלה"}</div>
-            <div style="font-size:12px;color:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"};opacity:0.85">ההאכלה האחרונה לפני ${sinceLabel}</div>
+            <div style="font-size:13px;font-weight:800;color:${alertColors[alertStage].text}">${alertColors[alertStage].title}</div>
+            <div style="font-size:12px;color:${alertColors[alertStage].text};opacity:0.85">${sinceLabel} מהאכלה האחרונה</div>
           </div>
-          <button data-action="open-modal" data-type="feed" style="background:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
+          <button data-action="open-modal" data-type="feed" style="background:${alertColors[alertStage].text};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
         </div>`:""}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
         ${[
