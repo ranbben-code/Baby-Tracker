@@ -22,7 +22,14 @@ input,textarea{font-family:'Nunito',sans-serif}
 .sync-dot.busy{background:#FFB300;animation:pulse .8s infinite}
 .sync-dot.err{background:#E05A5A}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-/* Custom confirm dialog */
+/* Feed alert banner */
+#feed-alert{animation:slideDown .4s ease}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+/* Card entrance animation */
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.log-card-new{animation:fadeSlideIn .35s ease forwards}
+/* Today card highlight pulse */
+@keyframes todayGlow{0%,100%{box-shadow:0 2px 10px rgba(44,107,172,0.08)}50%{box-shadow:0 4px 20px rgba(44,107,172,0.22)}}
 #bt-confirm{position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 #bt-confirm-box{background:#fff;border-radius:16px;padding:24px 20px;width:100%;max-width:320px;text-align:center;direction:rtl;font-family:'Nunito',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
 #bt-confirm-msg{font-size:16px;font-weight:800;color:#3A4A5C;margin-bottom:20px;line-height:1.4}
@@ -446,9 +453,27 @@ function renderDashboard(){
   const age=calcAge(baby.dob);
   const catIcons={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
 
+  // Feed alert: last feed across all logs
+  const allFeeds=[...logs].filter(l=>l.type==="feed").sort((a,b)=>Number(b.ts)-Number(a.ts));
+  const lastFeed=allFeeds[0];
+  const sinceLastFeed=lastFeed?Math.floor((Date.now()-Number(lastFeed.ts))/3600000):null;
+  const showFeedAlert=sinceLastFeed!==null&&sinceLastFeed>=2;
+
   let tabContent="";
   if(state.tab==="home"){
+    const alertColor=sinceLastFeed>=4?"#E05A5A":sinceLastFeed>=2?"#FF8C42":"#FF8C42";
+    const alertBg=sinceLastFeed>=4?"#FDEAEA":"#FFF0E6";
+    const alertBorder=sinceLastFeed>=4?"#F5C0C0":"#FFCBA4";
     tabContent=`
+      ${showFeedAlert?`
+        <div id="feed-alert" style="background:${alertBg};border:1.5px solid ${alertBorder};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">${sinceLastFeed>=4?"⚠️":"🍼"}</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:800;color:${alertColor}">${sinceLastFeed>=4?"כבר הרבה זמן לא האכלת!":"זמן להאכלה"}</div>
+            <div style="font-size:12px;color:${alertColor};opacity:0.8">ההאכלה האחרונה לפני ${sinceLastFeed} שעות${sinceLastFeed>=4?" — שים לב!":""}</div>
+          </div>
+          <button data-action="open-modal" data-type="feed" style="background:${alertColor};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
+        </div>`:""}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
         ${[
           {icon:ICONS.bottle,val:feeds.length,sub:totalMl?totalMl+" מ״ל":"האכלות",color:T.blue,bg:T.bluePale,border:T.blueLight},
@@ -801,10 +826,19 @@ function renderDayCard(day,C,ts,tp,catIcons,isNight){
   if(day.feeds>0)summaryParts.push(`${day.feeds} האכלות${day.ml?` · ${day.ml} מ״ל`:""}`);
   if(day.diapers>0)summaryParts.push(`${day.diapers} חיתולים`);
   if(day.slMs>0)summaryParts.push(dur(day.slMs)+" שינה");
+
+  // Today card gets special styling
+  const todayStyle=day.isToday&&!isNight
+    ?`background:linear-gradient(135deg,#EEF6FD 0%,#D6E9F8 100%);border:1.5px solid ${T.blueMid};animation:todayGlow 3s ease infinite;`
+    :day.isToday&&isNight
+    ?`background:rgba(74,143,212,0.15);border:1.5px solid rgba(74,143,212,0.4);`
+    :"";
+
   return`
-    <div style="${C("margin-bottom:10px;padding:0;")}overflow:hidden">
+    <div style="${C("margin-bottom:10px;padding:0;")}overflow:hidden;${todayStyle}">
       <button data-action="toggle-day" data-day="${day.ts}"
         style="width:100%;background:none;border:none;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:right">
+        ${day.isToday?`<span style="font-size:16px">✨</span>`:""}
         <div style="flex:1;min-width:0">
           <div style="font-weight:800;font-size:14px;color:${day.isToday?T.blue:tp}">${day.label}</div>
           <div style="font-size:11px;color:${ts};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summaryParts.join(" · ")||"אין רשומות"}</div>
@@ -816,7 +850,7 @@ function renderDayCard(day,C,ts,tp,catIcons,isNight){
         </div>
         <div style="color:${ts};font-size:14px;flex-shrink:0">${isOpen?"▲":"▼"}</div>
       </button>
-      ${isOpen?`<div style="padding:0 12px 12px">${day.logs.map(l=>renderLogItem(l,catIcons)).join("")}</div>`:""}
+      ${isOpen?`<div style="padding:0 12px 12px">${day.logs.map((l,i)=>`<div class="log-card-new" style="animation-delay:${i*0.04}s">${renderLogItem(l,catIcons)}</div>`).join("")}</div>`:""}
     </div>`;
 }
 
