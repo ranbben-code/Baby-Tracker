@@ -473,23 +473,25 @@ function renderDashboard(){
   // Feed alert: last feed across all logs
   const allFeeds=[...logs].filter(l=>l.type==="feed").sort((a,b)=>Number(b.ts)-Number(a.ts));
   const lastFeed=allFeeds[0];
-  const sinceLastFeed=lastFeed?Math.floor((Date.now()-Number(lastFeed.ts))/3600000):null;
-  const showFeedAlert=sinceLastFeed!==null&&sinceLastFeed>=2;
+  const sinceMs=lastFeed?Date.now()-Number(lastFeed.ts):null;
+  const sinceLastFeed=sinceMs!==null?Math.floor(sinceMs/3600000):null;
+  const sinceMin=sinceMs!==null?Math.floor((sinceMs%3600000)/60000):null;
+  const sinceLabel=sinceLastFeed!==null
+    ?(sinceLastFeed>0?`${sinceLastFeed} שעות ו-${sinceMin} דקות`:`${sinceMin} דקות`)
+    :null;
+  const showFeedAlert=sinceMs!==null&&sinceMs>=2*3600000;
 
   let tabContent="";
   if(state.tab==="home"){
-    const alertColor=sinceLastFeed>=4?"#E05A5A":sinceLastFeed>=2?"#FF8C42":"#FF8C42";
-    const alertBg=sinceLastFeed>=4?"#FDEAEA":"#FFF0E6";
-    const alertBorder=sinceLastFeed>=4?"#F5C0C0":"#FFCBA4";
     tabContent=`
       ${showFeedAlert?`
-        <div id="feed-alert" style="background:${alertBg};border:1.5px solid ${alertBorder};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+        <div id="feed-alert" style="background:${sinceLastFeed>=4?"#FDEAEA":"#FFF0E6"};border:1.5px solid ${sinceLastFeed>=4?"#F5C0C0":"#FFCBA4"};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
           <span style="font-size:22px">${sinceLastFeed>=4?"⚠️":"🍼"}</span>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:800;color:${alertColor}">${sinceLastFeed>=4?"כבר הרבה זמן לא האכלת!":"זמן להאכלה"}</div>
-            <div style="font-size:12px;color:${alertColor};opacity:0.8">ההאכלה האחרונה לפני ${sinceLastFeed} שעות${sinceLastFeed>=4?" — שים לב!":""}</div>
+            <div style="font-size:13px;font-weight:800;color:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"}">${sinceLastFeed>=4?"כבר הרבה זמן לא האכלת!":"זמן להאכלה"}</div>
+            <div style="font-size:12px;color:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"};opacity:0.85">ההאכלה האחרונה לפני ${sinceLabel}</div>
           </div>
-          <button data-action="open-modal" data-type="feed" style="background:${alertColor};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
+          <button data-action="open-modal" data-type="feed" style="background:${sinceLastFeed>=4?"#E05A5A":"#FF8C42"};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
         </div>`:""}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
         ${[
