@@ -768,9 +768,10 @@ function renderEditModal(l){
 }
 
 function groupByDay(logs){
-  // returns array of {dateKey, dateLabel, isToday, isYesterday, logs} sorted newest first
+  // sort all logs by ts descending first
+  const sorted=[...logs].sort((a,b)=>Number(b.ts)-Number(a.ts));
   const days={};
-  logs.forEach(l=>{
+  sorted.forEach(l=>{
     const d=new Date(Number(l.ts));
     d.setHours(0,0,0,0);
     const key=d.getTime();
@@ -780,6 +781,8 @@ function groupByDay(logs){
   const today=new Date();today.setHours(0,0,0,0);
   const yday=new Date(today);yday.setDate(yday.getDate()-1);
   return Object.values(days).sort((a,b)=>b.ts-a.ts).map(d=>{
+    // sort logs within day: newest first
+    d.logs.sort((a,b)=>Number(b.ts)-Number(a.ts));
     const isToday=d.ts===today.getTime();
     const isYday=d.ts===yday.getTime();
     const label=isToday?"היום":isYday?"אתמול":new Date(d.ts).toLocaleDateString("he-IL",{weekday:"long",day:"numeric",month:"long"});
