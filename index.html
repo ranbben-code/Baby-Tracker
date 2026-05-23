@@ -969,8 +969,8 @@ function renderModal(type,isNight){
           </div>`;
         }).join("");
       })()}
-      <div style="background:${c.bg};border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:${c.accent};font-weight:700;border:1px solid ${c.border};display:flex;align-items:center;gap:6px">
-        ${svgIcon(ICONS.clock,13,c.accent)} שעת האכלה: ${new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}
+      <div style="background:${c.bg};border-radius:6px;padding:9px 12px;margin-bottom:4px;font-size:12px;color:${c.accent};font-weight:700;border:1px solid ${c.border};display:flex;align-items:center;gap:6px">
+        ${svgIcon(ICONS.clock,13,c.accent)} ניתן לשנות את השעה למטה
       </div>`;
   }else if(type==="diaper"){
     inner=`<div style="display:flex;gap:8px;margin-bottom:16px">${DIAPER_TYPES.map(d=>`<button data-action="set-diaper-type" data-val="${d.value}" style="flex:1;padding:14px 6px;border-radius:6px;border:1.5px solid ${state.diaperType===d.value?c.accent:"#C8DAE8"};background:${state.diaperType===d.value?c.bg:"#fff"};font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${state.diaperType===d.value?c.accent:T.slate};text-align:center"><span style="pointer-events:none">${d.label}</span></button>`).join("")}</div>`;
@@ -1012,6 +1012,12 @@ function renderModal(type,isNight){
         </div>
         <div style="padding:18px 18px 40px">
           ${inner}
+          <div style="margin-bottom:14px">
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">שעה ותאריך</label>
+            <input id="modal-ts" type="datetime-local"
+              value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"
+              style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none"/>
+          </div>
           <textarea id="modal-note" placeholder="הערה (אופציונלי)..." style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;height:68px;resize:none;margin-bottom:14px">${state.note}</textarea>
           <button data-action="save-log" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:15px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
             ${svgIcon(ICONS.save,16,"#fff")} שמור
@@ -1310,16 +1316,21 @@ function saveLog(){
   const noteEl=document.getElementById("modal-note");
   const medNameEl=document.getElementById("modal-med-name");
   const medDoseEl=document.getElementById("modal-med-dose");
+  const tsEl=document.getElementById("modal-ts");
   if(amtEl)state.amount=amtEl.value;
   if(mlEl)state.ml=mlEl.value;
   if(noteEl)state.note=noteEl.value;
   if(medNameEl)state.medName=medNameEl.value;
   if(medDoseEl)state.medDose=medDoseEl.value;
 
+  // get timestamp from field, fallback to now
+  const customTs=tsEl&&tsEl.value?new Date(tsEl.value).getTime():null;
+  const ts=(customTs&&!isNaN(customTs))?customTs:Date.now();
+
   if(state.modal==="sleep"&&!state.sleepStart&&!state.elapsed){alert("לחץ על 'התחל להקליט שינה' קודם");return;}
 
   const id=String(Date.now()+Math.random());
-  const base={type:state.modal,ts:Date.now(),note:state.note,id};
+  const base={type:state.modal,ts,note:state.note,id};
   let log;
   if(state.modal==="feed"){
     const types=Array.isArray(state.feedType)?state.feedType:(state.feedType?[state.feedType]:[]);
