@@ -22,7 +22,10 @@ input,textarea{font-family:'Nunito',sans-serif}
 .sync-dot.busy{background:#FFB300;animation:pulse .8s infinite}
 .sync-dot.err{background:#E05A5A}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-/* Feed alert banner */
+/* ML Slider */
+.ml-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;outline:none;cursor:pointer}
+.ml-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);background:#2C6BAC}
+.ml-slider::-moz-range-thumb{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);background:#2C6BAC}
 #feed-alert{animation:slideDown .4s ease}
 @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
 /* Card entrance animation */
@@ -932,6 +935,28 @@ function renderCharts(logs,isNight,ts,C){
   }).join("");
 }
 
+function mlSlider(id,val,accent,bg){
+  const v=Math.round((val||0)/5)*5; // snap to nearest 5
+  const pct=v/200*100;
+  return`<div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <label style="font-size:12px;color:#8FA3B8;font-weight:700">כמה שתה (מ״ל)</label>
+      <div id="${id}-display" style="font-size:22px;font-weight:900;color:${accent};min-width:60px;text-align:left">${v||0} מ״ל</div>
+    </div>
+    <input type="range" id="${id}" class="ml-slider" min="0" max="200" step="5" value="${v}"
+      style="background:linear-gradient(to right,${accent} ${pct}%,#E0EDF7 ${pct}%)"
+      oninput="
+        const pct=this.value/200*100;
+        this.style.background='linear-gradient(to right,${accent} '+pct+'%,#E0EDF7 '+pct+'%)';
+        document.getElementById('${id}-display').textContent=this.value+' מ\u05f4ל';
+      "/>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#8FA3B8;margin-top:4px;font-weight:700">
+      <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span>
+    </div>
+  </div>`;
+}
+
+
 function renderModal(type,isNight){
   const c=CAT[type];
   const catIcon={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
@@ -958,33 +983,20 @@ function renderModal(type,isNight){
         if(types.length===0) return "";
         if(types.length===1){
           const isBreast=types[0].includes("breast");
-          return`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-            <div>
-              <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות (מ״ל)"}</label>
-              <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-            </div>
-            <div>
-              <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">מ״ל שתה</label>
-              <input id="modal-ml" type="number" inputmode="numeric" value="${state.ml}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${c.accent};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-            </div>
-          </div>`;
+          const mlVal=state._voiceMl||Number(state.ml)||0;
+          return isBreast?`<div style="margin-bottom:14px">
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">משך (דק׳)</label>
+            <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+          </div>`:mlSlider("modal-ml",mlVal,c.accent,c.bg);
         }
-        // multiple types — field per type
+        // multiple types — slider per type
         return types.map((t,i)=>{
           const ft=FEED_TYPES.find(f=>f.value===t);
           const isBreast=t.includes("breast");
+          const mlVal=state._voiceMl||0;
           return`<div style="background:${c.bg};border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid ${c.border}">
             <div style="font-size:12px;font-weight:800;color:${c.accent};margin-bottom:8px">${ft?.label||t}</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div>
-                <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">${isBreast?"משך (דק׳)":"כמות"}</label>
-                <input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-              </div>
-              <div>
-                <label style="display:block;margin-bottom:4px;font-size:11px;color:${T.muted};font-weight:700">מ״ל</label>
-                <input id="modal-ml-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid ${c.accent};font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-              </div>
-            </div>
+            ${isBreast?`<input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>`:mlSlider("modal-ml-"+i,mlVal,c.accent,c.bg)}
           </div>`;
         }).join("");
       })()}
@@ -1190,7 +1202,8 @@ function handleAction(e,el){
   }
   else if(action==="close-modal"){
     btConfirm("לסגור ולבטל את הרישום?","סגור",()=>{
-      clearInterval(sleepTimer);clearInterval(feedTimer);setState({modal:null});
+      clearInterval(sleepTimer);clearInterval(feedTimer);
+      setState({modal:null,_voiceMl:null});
     },false);
   }
   else if(action==="save-log")saveLog();
@@ -1356,21 +1369,18 @@ function saveLog(){
     const ft=types.join(",");
     let amount=null,ml=null,mlByType={};
     if(types.length<=1){
-      const amtEl=document.getElementById("modal-amount");
-      const mlEl=document.getElementById("modal-ml");
-      if(amtEl)state.amount=amtEl.value;
-      if(mlEl)state.ml=mlEl.value;
-      amount=state.amount?Number(state.amount):null;
-      ml=state.ml?Number(state.ml):null;
+      const amtEl=document.getElementById("modal-amount"); // breast duration
+      const mlEl=document.getElementById("modal-ml");      // slider
+      if(amtEl)amount=amtEl.value?Number(amtEl.value):null;
+      if(mlEl)ml=mlEl.value?Number(mlEl.value):null;
     } else {
-      // multiple types — collect per index
       types.forEach((t,i)=>{
         const amtEl=document.getElementById("modal-amount-"+i);
-        const mlEl=document.getElementById("modal-ml-"+i);
+        const mlEl=document.getElementById("modal-ml-"+i); // slider
         const a=amtEl?.value?Number(amtEl.value):null;
         const m=mlEl?.value?Number(mlEl.value):null;
-        if(m) mlByType[t]=m;
-        if(a&&!amount) amount=a;
+        if(m)mlByType[t]=m;
+        if(a&&!amount)amount=a;
       });
       ml=Object.values(mlByType).reduce((s,v)=>s+v,0)||null;
     }
@@ -1388,7 +1398,7 @@ function saveLog(){
   clearInterval(feedTimer);
   const logs=[log,...state.logs];
   store.saveLogs(state.selectedBaby.id,logs);
-  setState({logs,modal:null,sleeping:false,sleepStart:null,elapsed:0,feedRunning:false,feedStart:null,feedEl:0,syncStatus:"busy"});
+  setState({logs,modal:null,_voiceMl:null,sleeping:false,sleepStart:null,elapsed:0,feedRunning:false,feedStart:null,feedEl:0,syncStatus:"busy"});
 
   sb.upsertLog(logToRow(log,state.selectedBaby.id))
     .then(()=>setSyncStatus("ok"))
