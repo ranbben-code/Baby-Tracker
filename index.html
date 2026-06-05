@@ -1457,21 +1457,23 @@ function applyAmPm(h,text){
 }
 
 function showAmPmDialog(h, onResult){
-  const pmH=h+12>=24?h:h+12;
+  const pmH=h>=1&&h<=6?h:h+12>=24?h:h+12; // 1-6 = already night hours
+  const amLabel=h===12?"12:00 צהריים":`${String(h).padStart(2,"0")}:00 בוקר`;
+  const pmLabel=h>=1&&h<=6?`${String(h).padStart(2,"0")}:00 לילה`:`${String(pmH).padStart(2,"0")}:00 אחה״צ/ערב`;
   const ov=document.createElement("div");
   ov.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px";
   ov.innerHTML=`
     <div style="background:#fff;border-radius:16px;width:100%;max-width:300px;direction:rtl;font-family:'Nunito',sans-serif;padding:24px 20px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
       <div style="font-size:28px;margin-bottom:10px">🕐</div>
-      <div style="font-weight:800;font-size:16px;color:${T.slate};margin-bottom:6px">שעה ${h} — בוקר או אחה"צ/ערב?</div>
+      <div style="font-weight:800;font-size:16px;color:${T.slate};margin-bottom:6px">שעה ${h} — בוקר או לילה?</div>
       <div style="font-size:13px;color:${T.muted};margin-bottom:20px">לא ניתן לקבוע אוטומטית</div>
       <div style="display:flex;gap:10px">
-        <button id="ampm-am" style="flex:1;padding:13px 0;background:${T.bluePale};color:${T.blue};border:1.5px solid ${T.blueLight};border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">🌅 ${String(h).padStart(2,"0")}:00<br><span style="font-size:11px;font-weight:700">בוקר</span></button>
-        <button id="ampm-pm" style="flex:1;padding:13px 0;background:${T.lavender};color:#5B6FA6;border:1.5px solid #C5CEEA;border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">🌙 ${String(pmH).padStart(2,"0")}:00<br><span style="font-size:11px;font-weight:700">אחה"צ/ערב</span></button>
+        <button id="ampm-am" style="flex:1;padding:13px 0;background:${T.bluePale};color:${T.blue};border:1.5px solid ${T.blueLight};border-radius:10px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer">🌅 ${amLabel}</button>
+        <button id="ampm-pm" style="flex:1;padding:13px 0;background:${T.lavender};color:#5B6FA6;border:1.5px solid #C5CEEA;border-radius:10px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer">🌙 ${pmLabel}</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
-  document.getElementById("ampm-am").onclick=()=>{ov.remove();onResult(h);};
+  document.getElementById("ampm-am").onclick=()=>{ov.remove();onResult(h===12?12:h);};
   document.getElementById("ampm-pm").onclick=()=>{ov.remove();onResult(pmH);};
 }
 
@@ -1533,22 +1535,22 @@ function applyVoiceResult(parsed){
     render();
     // after render, set the datetime-local value and ml fields
     setTimeout(()=>{
+      // set datetime
       const inp=document.getElementById("modal-ts");
       if(inp&&ts)inp.value=localDtStr(ts);
-      // fill ml into correct fields
+      // fill ml — try all possible field IDs
       if(type==="feed"&&ml){
         const types=subtype?subtype.split(",").filter(Boolean):[];
-        if(types.length<=1){
-          const mlEl=document.getElementById("modal-ml");
-          if(mlEl)mlEl.value=ml;
-        } else {
-          types.forEach((_,i)=>{
-            const mlEl=document.getElementById("modal-ml-"+i);
-            if(mlEl)mlEl.value=ml;
-          });
-        }
+        // single type or no type
+        const singleEl=document.getElementById("modal-ml");
+        if(singleEl){singleEl.value=String(ml);}
+        // multi type fields
+        types.forEach((_,i)=>{
+          const el=document.getElementById("modal-ml-"+i);
+          if(el)el.value=String(ml);
+        });
       }
-    },80);
+    },150);
   }
 
   if(hourInfo){
