@@ -1364,15 +1364,15 @@ function saveLog(){
     if(types.length<=1){
       const amtEl=document.getElementById("modal-amount");
       const mlEl=document.getElementById("modal-ml");
-      if(amtEl)amount=amtEl.value?Number(amtEl.value):null;
-      if(mlEl)ml=mlEl.value?Number(mlEl.value):null;
+      if(amtEl)amount=amtEl.value!==""?Number(amtEl.value):null;
+      if(mlEl)ml=mlEl.value!==""?parseInt(mlEl.value):null;
     } else {
       types.forEach((t,i)=>{
         const amtEl=document.getElementById("modal-amount-"+i);
         const mlEl=document.getElementById("modal-ml-"+i);
-        const a=amtEl?.value?Number(amtEl.value):null;
-        const m=mlEl?.value?Number(mlEl.value):null;
-        if(m)mlByType[t]=m;
+        const a=amtEl?.value!==""?Number(amtEl.value):null;
+        const m=mlEl?.value!==""?parseInt(mlEl.value):null;
+        if(m!==null)mlByType[t]=m;
         if(a&&!amount)amount=a;
       });
       ml=Object.values(mlByType).reduce((s,v)=>s+v,0)||null;
