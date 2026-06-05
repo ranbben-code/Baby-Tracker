@@ -23,9 +23,6 @@ input,textarea{font-family:'Nunito',sans-serif}
 .sync-dot.err{background:#E05A5A}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* ML Slider */
-.ml-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;outline:none;cursor:pointer}
-.ml-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);background:#2C6BAC}
-.ml-slider::-moz-range-thumb{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25);background:#2C6BAC}
 #feed-alert{animation:slideDown .4s ease}
 @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
 /* Card entrance animation */
@@ -935,24 +932,15 @@ function renderCharts(logs,isNight,ts,C){
   }).join("");
 }
 
-function mlSlider(id,val,accent,bg){
-  const v=Math.round((val||0)/5)*5; // snap to nearest 5
-  const pct=v/200*100;
+function mlPicker(id,val,accent){
+  const v=Math.round((val||0)/5)*5;
+  const opts=[];
+  for(let i=0;i<=200;i+=5)opts.push(`<option value="${i}" ${i===v?"selected":""}>${i} מ״ל</option>`);
   return`<div style="margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <label style="font-size:12px;color:#8FA3B8;font-weight:700">כמה שתה (מ״ל)</label>
-      <div id="${id}-display" style="font-size:22px;font-weight:900;color:${accent};min-width:60px;text-align:left">${v||0} מ״ל</div>
-    </div>
-    <input type="range" id="${id}" class="ml-slider" min="0" max="200" step="5" value="${v}"
-      style="background:linear-gradient(to right,${accent} ${pct}%,#E0EDF7 ${pct}%)"
-      oninput="
-        const pct=this.value/200*100;
-        this.style.background='linear-gradient(to right,${accent} '+pct+'%,#E0EDF7 '+pct+'%)';
-        document.getElementById('${id}-display').textContent=this.value+' מ\u05f4ל';
-      "/>
-    <div style="display:flex;justify-content:space-between;font-size:10px;color:#8FA3B8;margin-top:4px;font-weight:700">
-      <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span>
-    </div>
+    <label style="display:block;margin-bottom:6px;font-size:12px;color:#8FA3B8;font-weight:700">כמה שתה (מ״ל)</label>
+    <select id="${id}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${accent};font-size:16px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;background:#fff;color:#3A4A5C;-webkit-appearance:none;appearance:none;text-align:right">
+      ${opts.join("")}
+    </select>
   </div>`;
 }
 
@@ -987,7 +975,7 @@ function renderModal(type,isNight){
           return isBreast?`<div style="margin-bottom:14px">
             <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">משך (דק׳)</label>
             <input id="modal-amount" type="number" inputmode="numeric" value="${state.amount}" placeholder="0" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
-          </div>`:mlSlider("modal-ml",mlVal,c.accent,c.bg);
+          </div>`:mlPicker("modal-ml",mlVal,c.accent,c.bg);
         }
         // multiple types — slider per type
         return types.map((t,i)=>{
@@ -996,7 +984,7 @@ function renderModal(type,isNight){
           const mlVal=state._voiceMl||0;
           return`<div style="background:${c.bg};border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid ${c.border}">
             <div style="font-size:12px;font-weight:800;color:${c.accent};margin-bottom:8px">${ft?.label||t}</div>
-            ${isBreast?`<input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>`:mlSlider("modal-ml-"+i,mlVal,c.accent,c.bg)}
+            ${isBreast?`<input id="modal-amount-${i}" type="number" inputmode="numeric" placeholder="0" style="width:100%;padding:10px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>`:mlPicker("modal-ml-"+i,mlVal,c.accent,c.bg)}
           </div>`;
         }).join("");
       })()}
@@ -1550,11 +1538,12 @@ function applyVoiceResult(parsed){
       if(inp&&ts)inp.value=localDtStr(ts);
       const v=state._voiceMl;
       if(type==="feed"&&v){
+        const snapped=Math.round(v/5)*5; // snap to nearest 5
         const s=document.getElementById("modal-ml");
-        if(s)s.value=String(v);
+        if(s)s.value=String(snapped);
         for(let i=0;i<5;i++){
           const f=document.getElementById("modal-ml-"+i);
-          if(f)f.value=String(v);
+          if(f)f.value=String(snapped);
         }
       }
     };
