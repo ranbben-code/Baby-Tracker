@@ -347,6 +347,7 @@ let state={
   editingTimeId:null,
   openDays:{},
   editingLog:null,
+  _voiceMl:null,
   syncStatus:"ok", // ok | busy | err
 };
 
@@ -1521,15 +1522,12 @@ function applyVoiceResult(parsed){
   if(!parsed)return;
   const{type,subtype,ml,hourInfo,text}=parsed;
 
-  // remove voice overlay immediately
-  const ov=document.getElementById("voice-overlay");
-  if(ov)ov.remove();
-
   function openWithData(ts){
-    // store prefill data in state so render can use it
+    const voiceMl=ml;
     state.modal=type;
     state.feedType=type==="feed"?(subtype?subtype.split(","):[]):[];
-    state.ml=ml?String(ml):"";
+    state.ml=voiceMl?String(voiceMl):"";
+    state._voiceMl=voiceMl||null; // dedicated field never reset by other actions
     state.amount="";
     state.diaperType=type==="diaper"?(subtype||"wet"):"wet";
     state.note="";
@@ -1537,17 +1535,16 @@ function applyVoiceResult(parsed){
     state.feedRunning=false;state.feedStart=null;state.feedEl=0;
     state.voiceTs=ts||null;
     render();
-    // fill after paint
-    const voiceMl=ml;
     const fillAll=()=>{
       const inp=document.getElementById("modal-ts");
       if(inp&&ts)inp.value=localDtStr(ts);
-      if(type==="feed"&&voiceMl){
+      const v=state._voiceMl;
+      if(type==="feed"&&v){
         const s=document.getElementById("modal-ml");
-        if(s)s.value=String(voiceMl);
+        if(s)s.value=String(v);
         for(let i=0;i<5;i++){
           const f=document.getElementById("modal-ml-"+i);
-          if(f)f.value=String(voiceMl);
+          if(f)f.value=String(v);
         }
       }
     };
@@ -1580,6 +1577,8 @@ function showVoiceUI(status,transcript=""){
     el=document.createElement("div");
     el.id="voice-overlay";
     el.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px";
+    // stop all clicks from reaching app below
+    el.addEventListener("click",e=>e.stopPropagation());
     document.body.appendChild(el);
   }
   const colors={listening:"#2C6BAC",processing:"#FF8C42",error:"#E05A5A",done:"#4CAF82"};
@@ -1619,10 +1618,12 @@ function startVoice(){
       if(parsed){
         showVoiceUI("done",transcript);
         setTimeout(()=>{
+          // remove overlay first, stopPropagation so no click leaks
           const ov=document.getElementById("voice-overlay");
           if(ov)ov.remove();
-          applyVoiceResult(parsed);
-        },800);
+          // small delay after removal so DOM settles
+          setTimeout(()=>applyVoiceResult(parsed),50);
+        },700);
       } else {
         showVoiceUI("error",`"${transcript}" — לא זוהה כהאכלה או חיתול`);
       }
