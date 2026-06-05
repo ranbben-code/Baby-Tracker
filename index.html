@@ -935,10 +935,11 @@ function renderCharts(logs,isNight,ts,C){
 function mlPicker(id,val,accent){
   const v=Math.round((val||0)/5)*5;
   const opts=[];
-  for(let i=0;i<=200;i+=5)opts.push(`<option value="${i}" ${i===v?"selected":""}>${i} מ״ל</option>`);
+  for(let i=0;i<=200;i+=5)opts.push(`<option value="${i}"${i===v?" selected":""}>${i} מ״ל</option>`);
+  // use onchange to keep value in sync, and data-val for JS setting
   return`<div style="margin-bottom:14px">
     <label style="display:block;margin-bottom:6px;font-size:12px;color:#8FA3B8;font-weight:700">כמה שתה (מ״ל)</label>
-    <select id="${id}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${accent};font-size:16px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;background:#fff;color:#3A4A5C;-webkit-appearance:none;appearance:none;text-align:right">
+    <select id="${id}" data-val="${v}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${accent};font-size:16px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;background:#fff;color:#3A4A5C">
       ${opts.join("")}
     </select>
   </div>`;
@@ -1084,6 +1085,10 @@ function attachEvents(){
   const ni=document.getElementById("new-baby-name");if(ni)ni.addEventListener("input",e=>state.newBabyName=e.target.value);
   const di=document.getElementById("new-baby-dob");if(di)di.addEventListener("input",e=>state.newBabyDob=e.target.value);
   const de=document.getElementById("dob-edit-input");if(de)de.addEventListener("input",e=>state.dobInput=e.target.value);
+  // force-set select values (mobile browsers sometimes ignore selected attribute in innerHTML)
+  document.querySelectorAll("select[data-val]").forEach(s=>{
+    s.value=s.dataset.val;
+  });
   const pi=document.getElementById("photo-input");
   if(pi)pi.addEventListener("change",e=>{
     const file=e.target.files[0];
@@ -1357,14 +1362,14 @@ function saveLog(){
     const ft=types.join(",");
     let amount=null,ml=null,mlByType={};
     if(types.length<=1){
-      const amtEl=document.getElementById("modal-amount"); // breast duration
-      const mlEl=document.getElementById("modal-ml");      // slider
+      const amtEl=document.getElementById("modal-amount");
+      const mlEl=document.getElementById("modal-ml");
       if(amtEl)amount=amtEl.value?Number(amtEl.value):null;
       if(mlEl)ml=mlEl.value?Number(mlEl.value):null;
     } else {
       types.forEach((t,i)=>{
         const amtEl=document.getElementById("modal-amount-"+i);
-        const mlEl=document.getElementById("modal-ml-"+i); // slider
+        const mlEl=document.getElementById("modal-ml-"+i);
         const a=amtEl?.value?Number(amtEl.value):null;
         const m=mlEl?.value?Number(mlEl.value):null;
         if(m)mlByType[t]=m;
@@ -1441,15 +1446,13 @@ function parseHebHour(str){
 }
 
 function applyAmPm(h,text){
-  if(text.includes("בוקר"))return h===12?0:h;
-  if(text.includes("צהריים"))return h===12?12:(h<12?h:h);
-  if(text.includes("אחר הצהריים"))return h<12?h+12:h;
+  if(text.includes("בוקר"))return h===12?0:h<=11?h:h;
+  if(text.includes("צהריים")||text.includes("אחר הצהריים")||text.includes("אחה״צ")||text.includes("אחה\"צ"))return h===12?12:h<12?h+12:h;
   if(text.includes("ערב"))return h<12&&h!==0?h+12:h;
   if(text.includes("לילה")){
-    // לילה = 21-05 range
-    if(h>=6&&h<=11)return h+12; // "6 בלילה" = 18:00 (ערב)
-    if(h>=1&&h<=5)return h;     // "3 בלילה" = 03:00
-    if(h===12)return 0;          // "12 בלילה" = 00:00
+    if(h>=6&&h<=11)return h+12;
+    if(h>=1&&h<=5)return h;
+    if(h===12)return 0;
     return h;
   }
   return null;
