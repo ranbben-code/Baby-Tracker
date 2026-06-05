@@ -1442,31 +1442,37 @@ function parseHebHour(str){
 }
 
 function applyAmPm(h,text){
-  if(text.includes("בוקר")||text.includes("צהריים")){
-    return h===12?12:(h<6?h+12:h);
+  if(text.includes("בוקר"))return h===12?0:h;
+  if(text.includes("צהריים"))return h===12?12:(h<12?h:h);
+  if(text.includes("אחר הצהריים"))return h<12?h+12:h;
+  if(text.includes("ערב"))return h<12&&h!==0?h+12:h;
+  if(text.includes("לילה")){
+    // לילה = 21-05 range
+    if(h>=6&&h<=11)return h+12; // "6 בלילה" = 18:00 (ערב)
+    if(h>=1&&h<=5)return h;     // "3 בלילה" = 03:00
+    if(h===12)return 0;          // "12 בלילה" = 00:00
+    return h;
   }
-  if(text.includes("ערב")||text.includes("לילה")){
-    return h===12?0:(h<12?h+12:h);
-  }
-  return null; // unknown — need to ask
+  return null;
 }
 
 function showAmPmDialog(h, onResult){
+  const pmH=h+12>=24?h:h+12;
   const ov=document.createElement("div");
   ov.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px";
   ov.innerHTML=`
     <div style="background:#fff;border-radius:16px;width:100%;max-width:300px;direction:rtl;font-family:'Nunito',sans-serif;padding:24px 20px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
       <div style="font-size:28px;margin-bottom:10px">🕐</div>
-      <div style="font-weight:800;font-size:16px;color:${T.slate};margin-bottom:6px">שעה ${h} — בוקר או לילה?</div>
+      <div style="font-weight:800;font-size:16px;color:${T.slate};margin-bottom:6px">שעה ${h} — בוקר או אחה"צ/ערב?</div>
       <div style="font-size:13px;color:${T.muted};margin-bottom:20px">לא ניתן לקבוע אוטומטית</div>
       <div style="display:flex;gap:10px">
-        <button id="ampm-am" style="flex:1;padding:13px 0;background:${T.bluePale};color:${T.blue};border:1.5px solid ${T.blueLight};border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">${h}:00 בוקר</button>
-        <button id="ampm-pm" style="flex:1;padding:13px 0;background:${T.lavender};color:#5B6FA6;border:1.5px solid #C5CEEA;border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">${h+12===24?0:h+12}:00 לילה/ערב</button>
+        <button id="ampm-am" style="flex:1;padding:13px 0;background:${T.bluePale};color:${T.blue};border:1.5px solid ${T.blueLight};border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">🌅 ${String(h).padStart(2,"0")}:00<br><span style="font-size:11px;font-weight:700">בוקר</span></button>
+        <button id="ampm-pm" style="flex:1;padding:13px 0;background:${T.lavender};color:#5B6FA6;border:1.5px solid #C5CEEA;border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">🌙 ${String(pmH).padStart(2,"0")}:00<br><span style="font-size:11px;font-weight:700">אחה"צ/ערב</span></button>
       </div>
     </div>`;
   document.body.appendChild(ov);
   document.getElementById("ampm-am").onclick=()=>{ov.remove();onResult(h);};
-  document.getElementById("ampm-pm").onclick=()=>{ov.remove();onResult(h+12>=24?h:h+12);};
+  document.getElementById("ampm-pm").onclick=()=>{ov.remove();onResult(pmH);};
 }
 
 function parseVoiceCommand(text){
@@ -1516,7 +1522,7 @@ function applyVoiceResult(parsed){
   function openWithData(ts){
     state.modal=type;
     state.feedType=type==="feed"?(subtype?subtype.split(","):[]):[];
-    state.ml=ml||"";
+    state.ml=ml?String(ml):"";
     state.amount="";
     state.diaperType=type==="diaper"?(subtype||"wet"):"wet";
     state.note="";
@@ -1525,27 +1531,36 @@ function applyVoiceResult(parsed){
     // store pre-filled ts for modal
     state.voiceTs=ts||null;
     render();
-    // after render, set the datetime-local value
+    // after render, set the datetime-local value and ml fields
     setTimeout(()=>{
       const inp=document.getElementById("modal-ts");
       if(inp&&ts)inp.value=localDtStr(ts);
-    },50);
+      // fill ml into correct fields
+      if(type==="feed"&&ml){
+        const types=subtype?subtype.split(",").filter(Boolean):[];
+        if(types.length<=1){
+          const mlEl=document.getElementById("modal-ml");
+          if(mlEl)mlEl.value=ml;
+        } else {
+          types.forEach((_,i)=>{
+            const mlEl=document.getElementById("modal-ml-"+i);
+            if(mlEl)mlEl.value=ml;
+          });
+        }
+      }
+    },80);
   }
 
   if(hourInfo){
-    const now=new Date();
-    if(hourInfo.needAmPm){
-      // check am/pm from text
-      const resolved=applyAmPm(hourInfo.h,text);
-      if(resolved!==null){
-        const d=new Date();d.setHours(resolved,0,0,0);
+    const resolved=applyAmPm(hourInfo.h,text);
+    if(resolved!==null){
+      const d=new Date();d.setHours(resolved,0,0,0);
+      openWithData(d.getTime());
+    } else if(hourInfo.needAmPm){
+      showAmPmDialog(hourInfo.h,h=>{
+        const d=new Date();d.setHours(h,0,0,0);
         openWithData(d.getTime());
-      } else {
-        showAmPmDialog(hourInfo.h,h=>{
-          const d=new Date();d.setHours(h,0,0,0);
-          openWithData(d.getTime());
-        });
-      }
+      });
     } else {
       const d=new Date();d.setHours(hourInfo.h,0,0,0);
       openWithData(d.getTime());
