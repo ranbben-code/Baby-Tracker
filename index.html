@@ -529,7 +529,12 @@ function renderDashboard(){
 
       <div style="${C()}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="font-size:12px;font-weight:700;color:${ts};display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:12px;font-weight:700;color:${ts};display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
+            <button data-action="start-voice" id="voice-btn" style="background:${isNight?"rgba(255,255,255,0.1)":"#EEF6FD"};border:1.5px solid ${T.blueLight};border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;color:${T.blue}">
+              🎤 קולי
+            </button>
+          </div>
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:11px;color:#0F9D58;font-weight:700">הורד נתונים ←</span>
             <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px">
@@ -1197,7 +1202,7 @@ function handleAction(e,el){
       sb.deleteLog(lid).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
     });
   }
-  else if(action==="export-csv")exportCSV(state.logs,state.selectedBaby.name);
+  else if(action==="start-voice"){startVoice();}
   else if(action==="export-sheets")exportToSheets(state.logs,state.selectedBaby.name);
   else if(action==="clear-logs"){
     btConfirm("למחוק את כל הנתונים של "+state.selectedBaby.name+"?","מחק הכל",()=>{
@@ -1389,7 +1394,228 @@ function saveLog(){
     .catch(()=>setSyncStatus("err"));
 }
 
-// ── Start ──────────────────────────────────────────────────────────────────
+// ── Voice Recognition ──────────────────────────────────────────────────────
+const HEB_NUMS={
+  "אפס":0,"אחת":1,"אחד":1,"שתיים":2,"שניים":2,"שלוש":3,"שלושה":3,
+  "ארבע":4,"ארבעה":4,"חמש":5,"חמישה":5,"שש":6,"ששה":6,
+  "שבע":7,"שבעה":7,"שמונה":8,"תשע":9,"תשעה":9,"עשר":10,"עשרה":10,
+  "אחת עשרה":11,"אחד עשר":11,"שתיים עשרה":12,"שנים עשר":12,
+  "שלוש עשרה":13,"ארבע עשרה":14,"חמש עשרה":15,"שש עשרה":16,
+  "שבע עשרה":17,"שמונה עשרה":18,"תשע עשרה":19,"עשרים":20,
+  "שלושים":30,"ארבעים":40,"חמישים":50,"שישים":60,"שבעים":70,
+  "שמונים":80,"תשעים":90,"מאה":100,"מאה ועשרים":120,"מאה וחמישים":150,
+  "מאה ושמונים":180,"מאתיים":200
+};
+
+function parseHebNum(str){
+  str=str.trim().toLowerCase();
+  if(HEB_NUMS[str]!==undefined)return HEB_NUMS[str];
+  // try digit
+  const n=parseInt(str);
+  if(!isNaN(n))return n;
+  // try compound: "שמונים ועשר" = 90
+  for(const[k,v] of Object.entries(HEB_NUMS)){
+    if(str.includes(k)){
+      str=str.replace(k,"").trim();
+      const rest=parseHebNum(str);
+      return rest?v+rest:v;
+    }
+  }
+  return null;
+}
+
+function parseHebHour(str){
+  // returns {h, needAmPm} or null
+  const patterns=[
+    {re:/שעה\s+(\S+(?:\s+\S+)?)/,g:1},
+    {re:/בשעה\s+(\S+(?:\s+\S+)?)/,g:1},
+  ];
+  for(const p of patterns){
+    const m=str.match(p.re);
+    if(m){
+      const word=m[p.g];
+      const h=parseHebNum(word.split(/\s+ו|\s+ב/)[0]);
+      if(h!==null&&h>=0&&h<=23)return{h,needAmPm:h>=1&&h<=12};
+    }
+  }
+  return null;
+}
+
+function applyAmPm(h,text){
+  if(text.includes("בוקר")||text.includes("צהריים")){
+    return h===12?12:(h<6?h+12:h);
+  }
+  if(text.includes("ערב")||text.includes("לילה")){
+    return h===12?0:(h<12?h+12:h);
+  }
+  return null; // unknown — need to ask
+}
+
+function showAmPmDialog(h, onResult){
+  const ov=document.createElement("div");
+  ov.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px";
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:300px;direction:rtl;font-family:'Nunito',sans-serif;padding:24px 20px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+      <div style="font-size:28px;margin-bottom:10px">🕐</div>
+      <div style="font-weight:800;font-size:16px;color:${T.slate};margin-bottom:6px">שעה ${h} — בוקר או לילה?</div>
+      <div style="font-size:13px;color:${T.muted};margin-bottom:20px">לא ניתן לקבוע אוטומטית</div>
+      <div style="display:flex;gap:10px">
+        <button id="ampm-am" style="flex:1;padding:13px 0;background:${T.bluePale};color:${T.blue};border:1.5px solid ${T.blueLight};border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">${h}:00 בוקר</button>
+        <button id="ampm-pm" style="flex:1;padding:13px 0;background:${T.lavender};color:#5B6FA6;border:1.5px solid #C5CEEA;border-radius:10px;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">${h+12===24?0:h+12}:00 לילה/ערב</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById("ampm-am").onclick=()=>{ov.remove();onResult(h);};
+  document.getElementById("ampm-pm").onclick=()=>{ov.remove();onResult(h+12>=24?h:h+12);};
+}
+
+function parseVoiceCommand(text){
+  const t=text.toLowerCase().trim();
+  let type=null,subtype=null,ml=null,amount=null,hourInfo=null;
+
+  // detect type
+  if(t.includes("האכל")||t.includes("אכל")||t.includes("שתה")||t.includes("הנק")){
+    type="feed";
+    // detect feed subtypes
+    const types=[];
+    if(t.includes("חלב שאוב")||t.includes("שאוב"))types.push("expressed");
+    if(t.includes("מטרנה")||t.includes("פורמולה"))types.push("formula");
+    if(t.includes("הנקה שמאל")||t.includes("שמאל"))types.push("breast_left");
+    if(t.includes("הנקה ימין")||t.includes("ימין"))types.push("breast_right");
+    if(t.includes("מוצקים"))types.push("solids");
+    if(types.length===0)types.push("expressed"); // default
+    subtype=types.join(",");
+    // detect ml
+    const mlMatch=t.match(/(\S+(?:\s+\S+)?)\s*מ[״"']?ל/);
+    if(mlMatch)ml=parseHebNum(mlMatch[1]);
+    if(!ml){
+      // try numbers anywhere
+      for(const[k,v] of Object.entries(HEB_NUMS)){
+        if(t.includes(k)&&v>0){ml=v;break;}
+      }
+    }
+  } else if(t.includes("חיתול")||t.includes("חית")){
+    type="diaper";
+    if(t.includes("שניהם")||t.includes("גם"))subtype="both";
+    else if(t.includes("מלוכלך")||t.includes("קקי")||t.includes("צואה"))subtype="dirty";
+    else subtype="wet"; // default
+  }
+
+  if(!type)return null;
+
+  // parse hour
+  hourInfo=parseHebHour(t);
+
+  return{type,subtype,ml,amount,hourInfo,text:t};
+}
+
+function applyVoiceResult(parsed){
+  if(!parsed)return;
+  const{type,subtype,ml,hourInfo,text}=parsed;
+
+  function openWithData(ts){
+    state.modal=type;
+    state.feedType=type==="feed"?(subtype?subtype.split(","):[]):[];
+    state.ml=ml||"";
+    state.amount="";
+    state.diaperType=type==="diaper"?(subtype||"wet"):"wet";
+    state.note="";
+    state.sleeping=false;state.sleepStart=null;state.elapsed=0;state.timerMs=null;
+    state.feedRunning=false;state.feedStart=null;state.feedEl=0;
+    // store pre-filled ts for modal
+    state.voiceTs=ts||null;
+    render();
+    // after render, set the datetime-local value
+    setTimeout(()=>{
+      const inp=document.getElementById("modal-ts");
+      if(inp&&ts)inp.value=localDtStr(ts);
+    },50);
+  }
+
+  if(hourInfo){
+    const now=new Date();
+    if(hourInfo.needAmPm){
+      // check am/pm from text
+      const resolved=applyAmPm(hourInfo.h,text);
+      if(resolved!==null){
+        const d=new Date();d.setHours(resolved,0,0,0);
+        openWithData(d.getTime());
+      } else {
+        showAmPmDialog(hourInfo.h,h=>{
+          const d=new Date();d.setHours(h,0,0,0);
+          openWithData(d.getTime());
+        });
+      }
+    } else {
+      const d=new Date();d.setHours(hourInfo.h,0,0,0);
+      openWithData(d.getTime());
+    }
+  } else {
+    openWithData(null); // use current time
+  }
+}
+
+function showVoiceUI(status,transcript=""){
+  let el=document.getElementById("voice-overlay");
+  if(!el){
+    el=document.createElement("div");
+    el.id="voice-overlay";
+    el.style.cssText="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px";
+    document.body.appendChild(el);
+  }
+  const colors={listening:"#2C6BAC",processing:"#FF8C42",error:"#E05A5A",done:"#4CAF82"};
+  const labels={listening:"מקשיב...",processing:"מעבד...",error:"לא הצלחתי להבין",done:"הבנתי!"};
+  el.innerHTML=`
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:300px;direction:rtl;font-family:'Nunito',sans-serif;padding:28px 20px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+      <div style="width:64px;height:64px;border-radius:50%;background:${colors[status]}22;border:3px solid ${colors[status]};margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:28px">
+        ${status==="listening"?"🎤":status==="processing"?"⚙️":status==="done"?"✅":"❌"}
+      </div>
+      <div style="font-size:16px;font-weight:800;color:${colors[status]};margin-bottom:8px">${labels[status]}</div>
+      ${transcript?`<div style="font-size:13px;color:${T.muted};margin-bottom:14px;line-height:1.5">"${transcript}"</div>`:""}
+      ${status==="error"?`<button onclick="document.getElementById('voice-overlay').remove()" style="background:${T.blue};color:#fff;border:none;border-radius:10px;padding:11px 24px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer">סגור</button>`:""}
+    </div>`;
+  if(status==="done"||status==="error"){
+    setTimeout(()=>{const e=document.getElementById("voice-overlay");if(e)e.remove();},1500);
+  }
+}
+
+function startVoice(){
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    alert("הדפדפן שלך לא תומך בזיהוי קולי. נסה Chrome.");
+    return;
+  }
+  const rec=new SpeechRecognition();
+  rec.lang="he-IL";
+  rec.interimResults=false;
+  rec.maxAlternatives=3;
+
+  showVoiceUI("listening");
+
+  rec.onresult=e=>{
+    const transcript=e.results[0][0].transcript;
+    showVoiceUI("processing",transcript);
+    setTimeout(()=>{
+      const parsed=parseVoiceCommand(transcript);
+      if(parsed){
+        showVoiceUI("done",transcript);
+        setTimeout(()=>applyVoiceResult(parsed),600);
+      } else {
+        showVoiceUI("error",`"${transcript}" — לא זוהה כהאכלה או חיתול`);
+      }
+    },400);
+  };
+  rec.onerror=e=>{
+    showVoiceUI("error","לא הצלחתי לשמוע. נסה שוב.");
+  };
+  rec.onend=()=>{
+    const el=document.getElementById("voice-overlay");
+    if(el&&el.querySelector(".listening"))el.remove();
+  };
+  rec.start();
+}
+
+
 init();
 
 // ── PWA Service Worker + Install Banner ───────────────────────────────────
