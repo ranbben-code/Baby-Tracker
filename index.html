@@ -1486,8 +1486,8 @@ function parseVoiceCommand(text){
     type="feed";
     // detect feed subtypes
     const types=[];
-    if(t.includes("חלב שאוב")||t.includes("שאוב")||t.includes("חלב שווה")||t.includes("שווה"))types.push("expressed");
-    if(t.includes("מטרנה")||t.includes("פורמולה"))types.push("formula");
+    if(t.includes("חלב שאוב")||t.includes("שאוב")||t.includes("חלב שווה")||t.includes("שווה")||t.includes("חלב שוב")||t.includes("שוב")||t.includes("חלב שאב")||t.includes("שאב")||t.includes("שאוף")||t.includes("שאף"))types.push("expressed");
+    if(t.includes("מטרנה")||t.includes("פורמולה")||t.includes("מתרנה")||t.includes("מטרנא"))types.push("formula");
     if(t.includes("הנקה שמאל")||t.includes("שמאל"))types.push("breast_left");
     if(t.includes("הנקה ימין")||t.includes("ימין"))types.push("breast_right");
     if(t.includes("מוצקים"))types.push("solids");
@@ -1521,11 +1521,15 @@ function applyVoiceResult(parsed){
   if(!parsed)return;
   const{type,subtype,ml,hourInfo,text}=parsed;
 
+  // remove voice overlay immediately
+  const ov=document.getElementById("voice-overlay");
+  if(ov)ov.remove();
+
   function openWithData(ts){
-    const voiceMl=ml; // capture before any state changes
+    // store prefill data in state so render can use it
     state.modal=type;
     state.feedType=type==="feed"?(subtype?subtype.split(","):[]):[];
-    state.ml=voiceMl?String(voiceMl):"";
+    state.ml=ml?String(ml):"";
     state.amount="";
     state.diaperType=type==="diaper"?(subtype||"wet"):"wet";
     state.note="";
@@ -1533,7 +1537,9 @@ function applyVoiceResult(parsed){
     state.feedRunning=false;state.feedStart=null;state.feedEl=0;
     state.voiceTs=ts||null;
     render();
-    const fill=()=>{
+    // fill after paint
+    const voiceMl=ml;
+    const fillAll=()=>{
       const inp=document.getElementById("modal-ts");
       if(inp&&ts)inp.value=localDtStr(ts);
       if(type==="feed"&&voiceMl){
@@ -1545,9 +1551,8 @@ function applyVoiceResult(parsed){
         }
       }
     };
-    fill();
-    setTimeout(fill,100);
-    setTimeout(fill,400);
+    requestAnimationFrame(()=>requestAnimationFrame(fillAll));
+    setTimeout(fillAll,300);
   }
 
   if(hourInfo){
@@ -1613,7 +1618,11 @@ function startVoice(){
       const parsed=parseVoiceCommand(transcript);
       if(parsed){
         showVoiceUI("done",transcript);
-        setTimeout(()=>applyVoiceResult(parsed),600);
+        setTimeout(()=>{
+          const ov=document.getElementById("voice-overlay");
+          if(ov)ov.remove();
+          applyVoiceResult(parsed);
+        },800);
       } else {
         showVoiceUI("error",`"${transcript}" — לא זוהה כהאכלה או חיתול`);
       }
