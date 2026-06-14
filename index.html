@@ -153,6 +153,9 @@ const sb={
   upsertLog:l=>sbFetch("logs",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(l)}),
   deleteLog:id=>sbFetch("logs?id=eq."+id,{method:"DELETE",prefer:""}),
   deleteLogs:bid=>sbFetch("logs?baby_id=eq."+bid,{method:"DELETE",prefer:""}),
+  getVaccines:bid=>sbFetch("vaccines?baby_id=eq."+bid+"&select=*&order=date.asc"),
+  upsertVaccine:v=>sbFetch("vaccines",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(v)}),
+  deleteVaccine:id=>sbFetch("vaccines?id=eq."+id,{method:"DELETE",prefer:""}),
 };
 
 // map app log → db row
@@ -731,6 +734,9 @@ function renderVaccinesTab(baby,isNight,tp,ts,C){
           <div style="${trackStyle(v.done)}"></div>
           <div style="${thumbStyle(v.done)}"></div>
         </div>
+        <button data-action="edit-vaccine" data-id="${v.id}" style="background:none;border:none;cursor:pointer;padding:4px;color:#FF9F66;display:flex;align-items:center" title="ערוך">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        </button>
         <button data-action="delete-vaccine" data-id="${v.id}" style="background:none;border:none;cursor:pointer;padding:4px;color:#FFAAC8;display:flex;align-items:center" title="מחק">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
         </button>
@@ -1306,6 +1312,9 @@ function mlPicker(id,val,accent){
 
 function renderModal(type,isNight){
   if(type==="add-vaccine"){
+    const isEdit=!!state._editVaccineId;
+    const initName=state._editVaccineName||"";
+    const initDate=state._editVaccineDate||new Date().toISOString().slice(0,10);
     return`
     <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center">
       <div style="background:#FFF9F5;border-radius:24px 24px 0 0;width:100%;max-width:500px;direction:rtl;max-height:80vh;overflow-y:auto">
@@ -1315,7 +1324,7 @@ function renderModal(type,isNight){
               <div style="background:#fff;border-radius:6px;padding:7px;border:1px solid #C8E6C9">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#4CAF50"><path d="M6.5 10h-2v5h2v-5zm5 0h-2v5h2v-5zm8.5 7H2v2h18v-2zm-3.5-7h-2v5h2v-5zM11.5 1L2 6v2h18V6l-9.5-5z"/></svg>
               </div>
-              <span style="font-size:17px;font-weight:800;color:#2E7D32">הוספת חיסון</span>
+              <span style="font-size:17px;font-weight:800;color:#2E7D32">${isEdit?"עריכת חיסון":"הוספת חיסון"}</span>
             </div>
             <button data-action="close-vaccine-modal" style="background:rgba(255,255,255,0.7);border:1px solid #C8E6C9;border-radius:6px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#666;font-size:15px">✕</button>
           </div>
@@ -1323,16 +1332,16 @@ function renderModal(type,isNight){
         <div style="padding:18px 18px 40px">
           <div style="margin-bottom:14px">
             <label style="display:block;margin-bottom:5px;font-size:12px;color:#666;font-weight:700">שם החיסון</label>
-            <input id="vac-name-input" type="text" placeholder="למשל: MMR, הפטיטיס B" autofocus
+            <input id="vac-name-input" type="text" placeholder="למשל: MMR, הפטיטיס B" value="${initName}" autofocus
               style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid #4CAF50;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
           </div>
           <div style="margin-bottom:20px">
             <label style="display:block;margin-bottom:5px;font-size:12px;color:#666;font-weight:700">תאריך</label>
-            <input id="vac-date-input" type="date" value="${new Date().toISOString().slice(0,10)}"
+            <input id="vac-date-input" type="date" value="${initDate}"
               style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none"/>
           </div>
           <button data-action="save-vaccine" style="background:#4CAF50;color:#fff;border:none;border-radius:9999px;padding:16px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;box-shadow:0 4px 12px rgba(76,175,80,0.35)">
-            שמור חיסון
+            ${isEdit?"שמור שינויים":"שמור חיסון"}
           </button>
         </div>
       </div>
@@ -1567,6 +1576,10 @@ function handleAction(e,el){
     const baby=state.babies.find(b=>b.id===el.dataset.id);
     if(!baby)return;
     setState({screen:"dashboard",selectedBaby:baby,logs:[],tab:"home",modal:null,isNight:null,dobInput:baby.dob||"",syncStatus:"busy"});
+    sb.getVaccines(baby.id).then(rows=>{
+      const vacs=rows.map(r=>({id:r.id,name:r.name,date:r.date||"",done:!!r.done}));
+      saveVaccines(baby.id,vacs);
+    }).catch(()=>{});
     sb.getLogs(baby.id).then(rows=>{
       const logs=rows.map(rowToLog);
       store.saveLogs(baby.id,logs);
@@ -1617,29 +1630,52 @@ function handleAction(e,el){
     setState({isNight:!(state.isNight!==null?state.isNight:_autoNight)});
   }
   else if(action==="set-tab")setState({tab:el.dataset.tab});
-  else if(action==="open-add-vaccine"){setState({modal:"add-vaccine",_vaccineName:"",_vaccineDate:new Date().toISOString().slice(0,10)});}
-  else if(action==="close-vaccine-modal"){setState({modal:null});}
+  else if(action==="open-add-vaccine"){setState({modal:"add-vaccine",_editVaccineId:null,_editVaccineName:"",_editVaccineDate:new Date().toISOString().slice(0,10)});}
+  else if(action==="close-vaccine-modal"){setState({modal:null,_editVaccineId:null});}
+  else if(action==="edit-vaccine"){
+    const vid=el.dataset.id;
+    const vac=getVaccines(state.selectedBaby.id).find(v=>v.id===vid);
+    if(!vac)return;
+    setState({modal:"add-vaccine",_editVaccineId:vid,_editVaccineName:vac.name,_editVaccineDate:vac.date});
+  }
   else if(action==="save-vaccine"){
     const name=(document.getElementById("vac-name-input")||{}).value?.trim();
     const date=(document.getElementById("vac-date-input")||{}).value;
     if(!name)return;
-    const list=getVaccines(state.selectedBaby.id);
-    list.push({id:Date.now().toString(),name,date:date||"",done:false});
-    saveVaccines(state.selectedBaby.id,list);
-    setState({modal:null,_vaccineName:"",_vaccineDate:""});
+    const editId=state._editVaccineId||null;
+    const bid=state.selectedBaby.id;
+    let list=getVaccines(bid);
+    let vac;
+    if(editId){
+      list=list.map(v=>v.id===editId?{...v,name,date:date||""}:v);
+      vac=list.find(v=>v.id===editId);
+    } else {
+      vac={id:Date.now().toString(),name,date:date||"",done:false,baby_id:bid};
+      list.push(vac);
+    }
+    saveVaccines(bid,list);
+    setState({modal:null,_editVaccineId:null,syncStatus:"busy"});
+    sb.upsertVaccine({id:vac.id,baby_id:bid,name:vac.name,date:vac.date,done:vac.done||false})
+      .then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
   else if(action==="toggle-vaccine"){
     const vid=el.dataset.id;
-    const list=getVaccines(state.selectedBaby.id).map(v=>v.id===vid?{...v,done:!v.done}:v);
-    saveVaccines(state.selectedBaby.id,list);
-    setState({});
+    const bid=state.selectedBaby.id;
+    const list=getVaccines(bid).map(v=>v.id===vid?{...v,done:!v.done}:v);
+    saveVaccines(bid,list);
+    const vac=list.find(v=>v.id===vid);
+    setState({syncStatus:"busy"});
+    sb.upsertVaccine({id:vac.id,baby_id:bid,name:vac.name,date:vac.date,done:vac.done})
+      .then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
   }
   else if(action==="delete-vaccine"){
     const vid=el.dataset.id;
+    const bid=state.selectedBaby.id;
     btConfirm("למחוק חיסון זה?","מחק",()=>{
-      const list=getVaccines(state.selectedBaby.id).filter(v=>v.id!==vid);
-      saveVaccines(state.selectedBaby.id,list);
-      setState({});
+      const list=getVaccines(bid).filter(v=>v.id!==vid);
+      saveVaccines(bid,list);
+      setState({syncStatus:"busy"});
+      sb.deleteVaccine(vid).then(()=>setSyncStatus("ok")).catch(()=>setSyncStatus("err"));
     },true);
   }
   else if(action==="save-claude-key"){
