@@ -379,6 +379,9 @@ function exportToSheets(logs,name){
 function getBabyPhoto(id){ return localStorage.getItem("bt_photo_"+id)||null; }
 function saveBabyPhoto(id,base64){ localStorage.setItem("bt_photo_"+id,base64); }
 
+function getVaccines(babyId){ try{return JSON.parse(localStorage.getItem("bt_vaccines_"+babyId)||"[]")}catch{return[]} }
+function saveVaccines(babyId,list){ localStorage.setItem("bt_vaccines_"+babyId,JSON.stringify(list)); }
+
 function localDtStr(ts){
   const d=ts?new Date(ts):new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'T'+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -615,6 +618,67 @@ function renderSelector(){
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
+function renderVaccinesTab(baby,isNight,tp,ts,C){
+  const vaccines=getVaccines(baby.id).sort((a,b)=>a.date.localeCompare(b.date));
+  const bg2=isNight?"rgba(255,255,255,0.06)":"#fff";
+  const border=isNight?"rgba(255,255,255,0.08)":"#F0E8E2";
+
+  const sliderStyle=(done)=>`
+    position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0;
+  `;
+  const trackStyle=(done)=>`
+    position:absolute;inset:0;border-radius:14px;
+    background:${done?"#4CAF50":"#C8C8C8"};
+    transition:background 0.25s;cursor:pointer;
+  `;
+  const thumbStyle=(done)=>`
+    position:absolute;top:3px;${done?"right:3px":"left:3px"};
+    width:22px;height:22px;border-radius:50%;background:#fff;
+    box-shadow:0 2px 6px rgba(0,0,0,0.22);transition:all 0.25s;
+  `;
+
+  const rows=vaccines.length===0
+    ?`<div style="text-align:center;padding:40px 20px;color:${ts};font-size:14px">עוד לא הוספת חיסונים</div>`
+    :vaccines.map(v=>{
+      const dateLabel=v.date?new Date(v.date).toLocaleDateString("he-IL",{day:"2-digit",month:"2-digit",year:"numeric"}):"";
+      return`
+      <div style="background:${bg2};border:1.5px solid ${border};border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700;color:${tp};font-family:'Quicksand',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.name}</div>
+          <div style="font-size:12px;color:${ts};margin-top:3px">${dateLabel}</div>
+        </div>
+        <div style="${sliderStyle(v.done)}" data-action="toggle-vaccine" data-id="${v.id}" title="${v.done?"סמן כלא בוצע":"סמן כבוצע"}">
+          <div style="${trackStyle(v.done)}"></div>
+          <div style="${thumbStyle(v.done)}"></div>
+        </div>
+        <button data-action="delete-vaccine" data-id="${v.id}" style="background:none;border:none;cursor:pointer;padding:4px;color:#FFAAC8;display:flex;align-items:center" title="מחק">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </div>`}).join("");
+
+  return`
+  <div style="padding:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:18px;font-weight:700;color:${tp};font-family:'Quicksand',sans-serif">פנקס חיסונים</div>
+      <button data-action="open-add-vaccine" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:9px 18px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 4px 12px rgba(255,159,102,0.35)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        הוסף
+      </button>
+    </div>
+    <div style="margin-bottom:12px;display:flex;gap:16px">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:${ts}">
+        <div style="width:28px;height:16px;border-radius:8px;background:#4CAF50;position:relative"><div style="position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff"></div></div>
+        בוצע
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:${ts}">
+        <div style="width:28px;height:16px;border-radius:8px;background:#C8C8C8;position:relative"><div style="position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff"></div></div>
+        טרם בוצע
+      </div>
+    </div>
+    ${rows}
+  </div>`;
+}
+
 function renderDashboard(){
   const baby=state.selectedBaby;
   const logs=state.logs;
@@ -803,6 +867,8 @@ function renderDashboard(){
 
   }else if(state.tab==="charts"){
     mainContent=`<div style="padding:14px">${renderCharts(logs,isNight,ts,C)}</div>`;
+  }else if(state.tab==="vaccines"){
+    mainContent=renderVaccinesTab(baby,isNight,tp,ts,C);
   }else{
     const allDays=groupByDay(logs);
     mainContent=`<div style="padding:0 14px">
@@ -822,7 +888,7 @@ function renderDashboard(){
   // Bottom Nav with Material Symbols
   const nav=`
     <nav style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"rgba(13,27,42,0.97)":"rgba(255,255,255,0.97)"};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:2px solid ${isNight?"rgba(255,255,255,0.07)":"#F0E8E2"};display:flex;justify-content:space-around;align-items:center;padding:10px 16px 22px;z-index:50;border-radius:24px 24px 0 0">
-      ${[{id:"home",icon:"home",label:"בית"},{id:"charts",icon:"insights",label:"גרפים"},{id:"history",icon:"history",label:"היסטוריה"}].map(t=>`
+      ${[{id:"home",icon:"home",label:"בית"},{id:"charts",icon:"insights",label:"גרפים"},{id:"history",icon:"history",label:"היסטוריה"},{id:"vaccines",icon:"vaccines",label:"חיסונים"}].map(t=>`
         <button data-action="set-tab" data-tab="${t.id}" style="background:${state.tab===t.id?"#FF9F66":"none"};border:none;cursor:pointer;font-family:inherit;text-align:center;padding:${state.tab===t.id?"8px 22px":"8px 14px"};border-radius:9999px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:${state.tab===t.id?"0 4px 12px rgba(255,159,102,0.35)":"none"}">
           ${ms(t.icon,state.tab===t.id?1:0,22,state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070"))}
           <div style="font-size:10px;font-weight:700;color:${state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070")}">${t.label}</div>
@@ -1157,6 +1223,39 @@ function mlPicker(id,val,accent){
 
 
 function renderModal(type,isNight){
+  if(type==="add-vaccine"){
+    return`
+    <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center">
+      <div style="background:#FFF9F5;border-radius:24px 24px 0 0;width:100%;max-width:500px;direction:rtl;max-height:80vh;overflow-y:auto">
+        <div style="background:#E8F5E9;border-radius:24px 24px 0 0;padding:16px 18px 14px;border-bottom:2px solid #C8E6C9">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="background:#fff;border-radius:6px;padding:7px;border:1px solid #C8E6C9">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="#4CAF50"><path d="M6.5 10h-2v5h2v-5zm5 0h-2v5h2v-5zm8.5 7H2v2h18v-2zm-3.5-7h-2v5h2v-5zM11.5 1L2 6v2h18V6l-9.5-5z"/></svg>
+              </div>
+              <span style="font-size:17px;font-weight:800;color:#2E7D32">הוספת חיסון</span>
+            </div>
+            <button data-action="close-vaccine-modal" style="background:rgba(255,255,255,0.7);border:1px solid #C8E6C9;border-radius:6px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#666;font-size:15px">✕</button>
+          </div>
+        </div>
+        <div style="padding:18px 18px 40px">
+          <div style="margin-bottom:14px">
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:#666;font-weight:700">שם החיסון</label>
+            <input id="vac-name-input" type="text" placeholder="למשל: MMR, הפטיטיס B" autofocus
+              style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid #4CAF50;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none"/>
+          </div>
+          <div style="margin-bottom:20px">
+            <label style="display:block;margin-bottom:5px;font-size:12px;color:#666;font-weight:700">תאריך</label>
+            <input id="vac-date-input" type="date" value="${new Date().toISOString().slice(0,10)}"
+              style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none"/>
+          </div>
+          <button data-action="save-vaccine" style="background:#4CAF50;color:#fff;border:none;border-radius:9999px;padding:16px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;box-shadow:0 4px 12px rgba(76,175,80,0.35)">
+            שמור חיסון
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
   const c=CAT[type];
   const catIcon={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
   let inner="";
@@ -1436,6 +1535,31 @@ function handleAction(e,el){
     setState({isNight:!(state.isNight!==null?state.isNight:_autoNight)});
   }
   else if(action==="set-tab")setState({tab:el.dataset.tab});
+  else if(action==="open-add-vaccine"){setState({modal:"add-vaccine",_vaccineName:"",_vaccineDate:new Date().toISOString().slice(0,10)});}
+  else if(action==="close-vaccine-modal"){setState({modal:null});}
+  else if(action==="save-vaccine"){
+    const name=(document.getElementById("vac-name-input")||{}).value?.trim();
+    const date=(document.getElementById("vac-date-input")||{}).value;
+    if(!name)return;
+    const list=getVaccines(state.selectedBaby.id);
+    list.push({id:Date.now().toString(),name,date:date||"",done:false});
+    saveVaccines(state.selectedBaby.id,list);
+    setState({modal:null,_vaccineName:"",_vaccineDate:""});
+  }
+  else if(action==="toggle-vaccine"){
+    const vid=el.dataset.id;
+    const list=getVaccines(state.selectedBaby.id).map(v=>v.id===vid?{...v,done:!v.done}:v);
+    saveVaccines(state.selectedBaby.id,list);
+    setState({});
+  }
+  else if(action==="delete-vaccine"){
+    const vid=el.dataset.id;
+    btConfirm("למחוק חיסון זה?","מחק",()=>{
+      const list=getVaccines(state.selectedBaby.id).filter(v=>v.id!==vid);
+      saveVaccines(state.selectedBaby.id,list);
+      setState({});
+    },true);
+  }
   else if(action==="open-modal"){
     clearInterval(sleepTimer);clearInterval(feedTimer);
     setState({modal:el.dataset.type,feedType:[],amount:"",ml:"",diaperType:"wet",medName:"",medDose:"",note:"",sleeping:false,sleepStart:null,elapsed:0,timerMs:null,feedRunning:false,feedStart:null,feedEl:0});
