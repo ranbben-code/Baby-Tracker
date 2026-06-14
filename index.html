@@ -1673,7 +1673,7 @@ ${contextLines.join("\n")}
 
 חשוב: אל תתן עצות רפואיות מחייבות. אם יש חשש רפואי, הפנה לרופא.`;
     setState({_consultLoading:true,_consultErr:"",_consultAnswer:""});
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({system_instruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:q}]}],generationConfig:{maxOutputTokens:1024}})
