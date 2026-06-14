@@ -434,63 +434,107 @@ function renderLoading(){
 function renderSelector(){
   const babies=state.babies;
   const syncColor=state.syncStatus==="ok"?T.green:state.syncStatus==="busy"?"#FFB300":T.danger;
-  const syncLabel=state.syncStatus==="ok"?"מסונכרן":state.syncStatus==="busy"?"מסנכרן...":"לא מחובר (נתונים מקומיים)";
+  const syncLabel=state.syncStatus==="ok"?"מסונכרן":state.syncStatus==="busy"?"מסנכרן...":"לא מחובר";
+
+  const addForm=state.addingBaby?`
+    <div style="background:rgba(255,255,255,0.9);border-radius:28px;padding:24px 20px;margin:0 20px 20px;box-shadow:0 8px 32px rgba(200,149,108,0.18);border:2px solid #FFDBC1;animation:splash-fade-in 0.3s ease both">
+      <div style="font-weight:800;font-size:17px;color:${T.slate};margin-bottom:18px;text-align:center">תינוק חדש 🍼</div>
+      <input id="new-baby-name" value="${state.newBabyName}" placeholder="שם התינוק" style="width:100%;padding:14px 16px;border-radius:14px;border:2px solid #FFDBC1;font-size:16px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:12px;background:#FFF9F5;color:${T.slate}"/>
+      <label style="display:block;font-size:12px;font-weight:700;color:${T.muted};margin-bottom:6px">תאריך לידה</label>
+      <input id="new-baby-dob" type="date" value="${state.newBabyDob}" style="width:100%;padding:14px 16px;border-radius:14px;border:2px solid #FFDBC1;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none;margin-bottom:16px;background:#FFF9F5;color:${T.slate}"/>
+      <div style="margin-bottom:18px">
+        <div style="font-size:12px;font-weight:700;color:${T.muted};margin-bottom:8px;text-align:center">בחר אמוג׳י</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+          ${BABY_EMOJIS.map(e=>`<button data-action="pick-emoji" data-emoji="${e}" style="font-size:24px;background:${state.newBabyEmoji===e?"#FFDBC1":"rgba(255,255,255,0.8)"};border:2px solid ${state.newBabyEmoji===e?"#FF9F66":"#F0E8E2"};border-radius:12px;padding:8px 10px;cursor:pointer;transition:all 0.15s">${e}</button>`).join("")}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button data-action="cancel-add" style="flex:1;background:rgba(255,255,255,0.8);color:${T.muted};border:2px solid #F0E8E2;border-radius:14px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer">ביטול</button>
+        <button data-action="confirm-add" style="flex:2;background:linear-gradient(135deg,#FF9F66,#F07840);color:#fff;border:none;border-radius:14px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 16px rgba(255,159,102,0.4)">הוסף ✓</button>
+      </div>
+    </div>`:"";
+
   return`
-  <div style="min-height:100vh;background:linear-gradient(180deg,#FFE4CC 0%,${T.cream} 100%);padding-bottom:40px;position:relative;overflow:hidden">
-    <svg viewBox="0 0 390 180" style="position:absolute;top:0;left:0;width:100%;height:180px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
-      ${cloudsSVG(false)}
-    </svg>
-    <div style="position:relative;text-align:center;padding:52px 14px 0;margin-bottom:24px">
-      <div style="display:flex;justify-content:center;margin-bottom:8px">${bearSVG(false,52)}</div>
-      <h1 style="font-size:24px;font-weight:900;color:${T.blue};letter-spacing:-0.5px;margin-bottom:4px">Baby Tracker</h1>
-      <p style="color:${T.muted};font-size:13px;font-weight:700">בחר תינוק או הוסף חדש</p>
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px">
+  <style>
+    @keyframes selector-pop{0%{opacity:0;transform:scale(0.88) translateY(16px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes selector-fade{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+    .baby-circle-btn:active{transform:scale(0.95);}
+    .baby-circle-btn:hover .baby-delete-btn{opacity:1!important}
+  </style>
+  <div style="min-height:100vh;background:linear-gradient(170deg,#FFE8D0 0%,#FFF5EC 45%,#FFF9F5 100%);display:flex;flex-direction:column;padding-bottom:24px;position:relative;overflow:hidden">
+
+    <!-- bg blobs -->
+    <div style="position:absolute;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(255,159,102,0.15) 0%,transparent 70%);top:-80px;left:-60px;pointer-events:none"></div>
+    <div style="position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(127,192,156,0.12) 0%,transparent 70%);bottom:100px;right:-40px;pointer-events:none"></div>
+
+    <!-- Top brand text -->
+    <div style="text-align:center;padding-top:56px;margin-bottom:28px;animation:selector-fade 0.5s ease both">
+      <div style="font-size:36px;font-weight:900;color:#FF9F66;font-family:'Quicksand',sans-serif;letter-spacing:-1px;line-height:1">Baby-Tracker</div>
+    </div>
+
+    <!-- Welcome text -->
+    <div style="text-align:center;padding:0 20px;margin-bottom:40px;animation:selector-fade 0.5s ease both;animation-delay:0.1s">
+      <h1 style="font-size:34px;font-weight:900;color:${T.slate};letter-spacing:-1px;line-height:1.15;margin-bottom:8px">ברוכים השבים</h1>
+      <p style="font-size:15px;color:${T.muted};font-weight:600">במי נטפל היום?</p>
+      <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-top:10px">
         <span id="sync-dot" class="sync-dot ${state.syncStatus}"></span>
         <span style="font-size:11px;color:${syncColor};font-weight:700">${syncLabel}</span>
-        <button data-action="sync-refresh" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center" title="רענן">
-          ${svgIcon(ICONS.refresh,14,T.muted)}
+        <button data-action="sync-refresh" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center;opacity:0.6">
+          ${svgIcon(ICONS.refresh,13,T.muted)}
         </button>
       </div>
     </div>
-    <div style="padding:0 14px">
-      ${babies.map(b=>`
-        <div style="background:#fff;border-radius:20px;padding:16px;margin-bottom:12px;border:2px solid #F5EFEA;box-shadow:0 6px 0px rgba(216,199,188,0.25);display:flex;align-items:center;gap:12px">
-          <div style="flex-shrink:0">${renderBabyAvatar(b,48,false)}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:700;font-size:17px;color:${T.slate};font-family:'Quicksand',sans-serif">${b.name}</div>
-            <div style="font-size:12px;color:${T.blue};font-weight:700;margin-top:1px">${b.dob?"בן "+calcAge(b.dob):'<span style="color:'+T.muted+'">תאריך לידה לא הוזן</span>'}</div>
-          </div>
-          <button data-action="select-baby" data-id="${b.id}" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:10px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 8px rgba(255,159,102,0.3)">כנס</button>
-          <button data-action="delete-baby" data-id="${b.id}" style="background:#fff;border:2px solid #F5EFEA;border-radius:12px;padding:10px;cursor:pointer;display:flex">
-            ${svgIcon(ICONS.trash,15,T.danger)}
+
+    <!-- Baby circles grid -->
+    ${!state.addingBaby?`
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:28px;padding:0 20px;margin-bottom:32px">
+      ${babies.map((b,i)=>`
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;animation:selector-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;animation-delay:${0.15+i*0.1}s;position:relative" class="baby-circle-btn">
+          <button data-action="select-baby" data-id="${b.id}" style="background:none;border:none;cursor:pointer;padding:0;position:relative;display:block">
+            <div style="width:130px;height:130px;border-radius:50%;background:linear-gradient(145deg,rgba(255,219,193,0.6),rgba(255,240,230,0.9));border:3px solid rgba(255,159,102,0.3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(200,149,108,0.2),0 2px 8px rgba(200,149,108,0.1);overflow:hidden;transition:transform 0.2s,box-shadow 0.2s">
+              ${b.photoData
+                ?`<img src="${b.photoData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+                :`<span style="font-size:52px">${b.emoji||"👶"}</span>`}
+            </div>
           </button>
+          <button data-action="delete-baby" data-id="${b.id}" class="baby-delete-btn" style="position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid #FFDBC1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;box-shadow:0 2px 6px rgba(0,0,0,0.1)">
+            <span style="font-size:11px;color:${T.danger}">✕</span>
+          </button>
+          <div style="text-align:center">
+            <div style="font-size:18px;font-weight:800;color:#FF9F66;font-family:'Quicksand',sans-serif">${b.name}</div>
+            <div style="font-size:13px;color:${T.muted};font-weight:600;margin-top:2px">${b.dob?calcAge(b.dob):"גיל לא הוזן"}</div>
+          </div>
         </div>
       `).join("")}
 
-      ${state.addingBaby?`
-        <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08)">
-          <div style="font-weight:800;font-size:15px;color:${T.slate};margin-bottom:14px;display:flex;align-items:center;gap:8px">
-            ${bearSVG(false,32)} תינוק חדש
-          </div>
-          <input id="new-baby-name" value="${state.newBabyName}" placeholder="שם התינוק" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid ${T.blue};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;margin-bottom:10px"/>
-          <label style="display:block;font-size:12px;font-weight:700;color:${T.muted};margin-bottom:5px">תאריך לידה</label>
-          <input id="new-baby-dob" type="date" value="${state.newBabyDob}" style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none;margin-bottom:12px"/>
-          <div style="margin-bottom:14px">
-            <div style="font-size:12px;font-weight:700;color:${T.muted};margin-bottom:7px">אמוג׳י</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px">
-              ${BABY_EMOJIS.map(e=>`<button data-action="pick-emoji" data-emoji="${e}" style="font-size:22px;background:${state.newBabyEmoji===e?T.bluePale:"#fff"};border:1.5px solid ${state.newBabyEmoji===e?T.blue:"#C8DAE8"};border-radius:6px;padding:7px 10px;cursor:pointer">${e}</button>`).join("")}
-            </div>
-          </div>
-          <div style="display:flex;gap:8px">
-            <button data-action="cancel-add" style="flex:1;background:#fff;color:${T.muted};border:1.5px solid ${T.muted};border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">ביטול</button>
-            <button data-action="confirm-add" style="flex:2;background:${T.blue};color:#fff;border:none;border-radius:6px;padding:11px 0;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">הוסף ✓</button>
-          </div>
-        </div>
-      `:`
-        <button data-action="start-add" style="width:100%;padding:14px;background:rgba(255,255,255,0.8);border:2px dashed #FFDBC1;border-radius:20px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;color:#FF9F66;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
-          ${svgIcon(ICONS.plus,16,"#FF9F66")} הוסף תינוק חדש
+      <!-- Add circle -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;animation:selector-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;animation-delay:${0.15+babies.length*0.1}s">
+        <button data-action="start-add" style="width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,0.5);border:2.5px dashed rgba(255,159,102,0.5);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:all 0.2s">
+          <span style="font-size:32px;color:#FF9F66;line-height:1">+</span>
         </button>
-      `}
+        <div style="text-align:center">
+          <div style="font-size:15px;font-weight:700;color:#FF9F66;font-family:'Quicksand',sans-serif">הוספה</div>
+        </div>
+      </div>
+    </div>`:""}
+
+    <!-- Add form -->
+    ${addForm}
+
+    <!-- Bottom security bar -->
+    <div style="margin:auto 20px 0;background:rgba(255,255,255,0.7);backdrop-filter:blur(10px);border-radius:20px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;border:1.5px solid rgba(255,219,193,0.4);box-shadow:0 2px 12px rgba(200,149,108,0.1);animation:selector-fade 0.5s ease both;animation-delay:0.4s">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:34px;height:34px;border-radius:10px;background:#FFF0E6;border:1.5px solid #FFDBC1;display:flex;align-items:center;justify-content:center">
+          <span style="font-size:16px">🛡️</span>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:800;color:${T.slate}">מאובטח ופרטי</div>
+          <div style="font-size:11px;color:${T.muted};font-weight:600">הנתונים שלך מוצפנים</div>
+        </div>
+      </div>
+      <button data-action="sync-refresh" style="width:34px;height:34px;border-radius:10px;background:#FFF0E6;border:1.5px solid #FFDBC1;cursor:pointer;display:flex;align-items:center;justify-content:center" title="רענן">
+        ${svgIcon(ICONS.refresh,16,"#FF9F66")}
+      </button>
     </div>
   </div>`;
 }
