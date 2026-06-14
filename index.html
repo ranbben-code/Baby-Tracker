@@ -618,6 +618,77 @@ function renderSelector(){
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
+function renderConsultTab(baby,logs,isNight,tp,ts){
+  const bg2=isNight?"rgba(255,255,255,0.06)":"#fff";
+  const border=isNight?"rgba(255,255,255,0.1)":"#F0E8E2";
+  const apiKey=localStorage.getItem("bt_claude_key")||"";
+  const answer=state._consultAnswer||"";
+  const loading=state._consultLoading||false;
+  const err=state._consultErr||"";
+
+  // Build context summary from recent logs
+  const now=Date.now();
+  const lastFeed=logs.filter(l=>l.type==="feed").sort((a,b)=>b.ts-a.ts)[0];
+  const lastSleep=logs.filter(l=>l.type==="sleep"&&l.durationMs).sort((a,b)=>b.ts-a.ts)[0];
+  const lastDiaper=logs.filter(l=>l.type==="diaper").sort((a,b)=>b.ts-a.ts)[0];
+  const ageMs=baby.dob?now-new Date(baby.dob).getTime():null;
+  const ageWeeks=ageMs?Math.floor(ageMs/(7*86400000)):null;
+  const sinceLastFeed=lastFeed?Math.round((now-Number(lastFeed.ts))/60000):null;
+  const sinceLastDiaper=lastDiaper?Math.round((now-Number(lastDiaper.ts))/60000):null;
+
+  const contextLines=[];
+  if(baby.name)contextLines.push(`שם התינוק: ${baby.name}`);
+  if(ageWeeks!==null)contextLines.push(`גיל: ${ageWeeks} שבועות`);
+  if(sinceLastFeed!==null)contextLines.push(`האכלה אחרונה: לפני ${sinceLastFeed} דקות`+(lastFeed?.ml?` (${lastFeed.ml} מ"ל)`:""));
+  if(sinceLastDiaper!==null)contextLines.push(`חיתול אחרון: לפני ${sinceLastDiaper} דקות`+(lastDiaper?.subtype?` (${DIAPER_TYPES.find(d=>d.value===lastDiaper.subtype)?.label||""})`:""));
+  if(lastSleep?.durationMs)contextLines.push(`שנת לילה אחרונה: ${Math.round(lastSleep.durationMs/3600000*10)/10} שעות`);
+
+  return`
+  <div style="padding:16px">
+    ${!apiKey?`
+    <div style="background:${isNight?"rgba(255,159,102,0.1)":"#FFF3E0"};border:2px solid #FFB74D;border-radius:18px;padding:16px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:#E65100;margin-bottom:8px">הגדרת API Key</div>
+      <div style="font-size:12px;color:${ts};margin-bottom:10px">על מנת להשתמש בייעוץ AI נדרש מפתח Anthropic. הוא נשמר רק במכשיר שלך.</div>
+      <input id="claude-key-input" type="password" placeholder="sk-ant-..." value="${apiKey}"
+        style="width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid #FFB74D;font-size:13px;font-family:monospace;box-sizing:border-box;outline:none;margin-bottom:10px;direction:ltr"/>
+      <button data-action="save-claude-key" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:10px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%">שמור מפתח</button>
+    </div>`:`
+    <div style="background:${bg2};border:1.5px solid ${border};border-radius:18px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:${ts}">🔑 מפתח מוגדר</span>
+      <button data-action="clear-claude-key" style="background:none;border:none;font-size:11px;color:#FFAAC8;cursor:pointer;font-family:inherit;font-weight:700">שנה</button>
+    </div>`}
+
+    ${contextLines.length>0?`
+    <div style="background:${isNight?"rgba(255,243,194,0.08)":"#FFFDE7"};border:1.5px solid ${isNight?"rgba(255,243,194,0.2)":"#FFF176"};border-radius:14px;padding:10px 14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:${isNight?"rgba(255,243,194,0.6)":"#827717"};margin-bottom:5px">הקשר שנשלח אוטומטית</div>
+      <div style="font-size:12px;color:${isNight?"rgba(255,243,194,0.85)":"#555"};line-height:1.7">${contextLines.join("<br>")}</div>
+    </div>`:""}
+
+    <textarea id="consult-input" placeholder="שאל שאלה... למשל: התינוק בוכה כבר שעה אחרי אכילה, מה יכול להיות?"
+      style="width:100%;padding:14px;border-radius:16px;border:2px solid ${apiKey?"#FF9F66":"#E0E0E0"};font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;height:100px;resize:none;background:${bg2};color:${tp};margin-bottom:10px;${!apiKey?"opacity:0.5;":""}line-height:1.6"
+      ${!apiKey?"disabled":""}></textarea>
+
+    <button data-action="send-consult" ${!apiKey||loading?"disabled":""}
+      style="background:${apiKey&&!loading?"linear-gradient(135deg,#FF9F66,#F07840)":"#E0E0E0"};color:#fff;border:none;border-radius:9999px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:${apiKey&&!loading?"pointer":"default"};width:100%;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:${apiKey&&!loading?"0 4px 14px rgba(255,159,102,0.4)":"none"};margin-bottom:16px">
+      ${loading?`<span style="width:18px;height:18px;border:3px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block"></span> מחשב...`:`<svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg> שלח שאלה`}
+    </button>
+
+    ${err?`<div style="background:#FFF0F0;border:1.5px solid #FFAAC8;border-radius:14px;padding:14px;margin-bottom:14px;font-size:13px;color:#C62828">${err}</div>`:""}
+
+    ${answer?`
+    <div style="background:${isNight?"rgba(255,255,255,0.06)":"#F0FFF4"};border:2px solid ${isNight?"rgba(255,255,255,0.1)":"#A5D6A7"};border-radius:18px;padding:16px">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#FF9F66,#F07840);display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        </div>
+        <span style="font-size:13px;font-weight:700;color:${isNight?"rgba(255,255,255,0.7)":"#2E7D32"}">תשובת AI</span>
+        <span style="font-size:10px;color:${ts};margin-right:auto">לא מחליף ייעוץ רפואי</span>
+      </div>
+      <div style="font-size:14px;color:${tp};line-height:1.8;white-space:pre-wrap">${answer}</div>
+    </div>`:""}
+  </div>`;
+}
+
 function renderVaccinesTab(baby,isNight,tp,ts,C){
   const vaccines=getVaccines(baby.id).sort((a,b)=>a.date.localeCompare(b.date));
   const bg2=isNight?"rgba(255,255,255,0.06)":"#fff";
@@ -869,6 +940,8 @@ function renderDashboard(){
     mainContent=`<div style="padding:14px">${renderCharts(logs,isNight,ts,C)}</div>`;
   }else if(state.tab==="vaccines"){
     mainContent=renderVaccinesTab(baby,isNight,tp,ts,C);
+  }else if(state.tab==="consult"){
+    mainContent=renderConsultTab(baby,logs,isNight,tp,ts);
   }else{
     const allDays=groupByDay(logs);
     mainContent=`<div style="padding:0 14px">
@@ -888,7 +961,7 @@ function renderDashboard(){
   // Bottom Nav with Material Symbols
   const nav=`
     <nav style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"rgba(13,27,42,0.97)":"rgba(255,255,255,0.97)"};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:2px solid ${isNight?"rgba(255,255,255,0.07)":"#F0E8E2"};display:flex;justify-content:space-around;align-items:center;padding:10px 16px 22px;z-index:50;border-radius:24px 24px 0 0">
-      ${[{id:"home",icon:"home",label:"בית"},{id:"charts",icon:"insights",label:"גרפים"},{id:"history",icon:"history",label:"היסטוריה"},{id:"vaccines",icon:"vaccines",label:"חיסונים"}].map(t=>`
+      ${[{id:"home",icon:"home",label:"בית"},{id:"charts",icon:"insights",label:"גרפים"},{id:"history",icon:"history",label:"היסטוריה"},{id:"vaccines",icon:"vaccines",label:"חיסונים"},{id:"consult",icon:"psychiatry",label:"ייעוץ"}].map(t=>`
         <button data-action="set-tab" data-tab="${t.id}" style="background:${state.tab===t.id?"#FF9F66":"none"};border:none;cursor:pointer;font-family:inherit;text-align:center;padding:${state.tab===t.id?"8px 22px":"8px 14px"};border-radius:9999px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:${state.tab===t.id?"0 4px 12px rgba(255,159,102,0.35)":"none"}">
           ${ms(t.icon,state.tab===t.id?1:0,22,state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070"))}
           <div style="font-size:10px;font-weight:700;color:${state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070")}">${t.label}</div>
@@ -1559,6 +1632,60 @@ function handleAction(e,el){
       saveVaccines(state.selectedBaby.id,list);
       setState({});
     },true);
+  }
+  else if(action==="save-claude-key"){
+    const key=document.getElementById("claude-key-input")?.value?.trim();
+    if(key){localStorage.setItem("bt_claude_key",key);setState({});}
+  }
+  else if(action==="clear-claude-key"){
+    localStorage.removeItem("bt_claude_key");
+    setState({_consultAnswer:"",_consultErr:""});
+  }
+  else if(action==="send-consult"){
+    const q=document.getElementById("consult-input")?.value?.trim();
+    if(!q)return;
+    const apiKey=localStorage.getItem("bt_claude_key");
+    if(!apiKey)return;
+    const baby=state.selectedBaby;
+    const logs=state.logs||[];
+    const now=Date.now();
+    const lastFeed=logs.filter(l=>l.type==="feed").sort((a,b)=>b.ts-a.ts)[0];
+    const lastDiaper=logs.filter(l=>l.type==="diaper").sort((a,b)=>b.ts-a.ts)[0];
+    const lastSleep=logs.filter(l=>l.type==="sleep"&&l.durationMs).sort((a,b)=>b.ts-a.ts)[0];
+    const ageMs=baby.dob?now-new Date(baby.dob).getTime():null;
+    const ageWeeks=ageMs?Math.floor(ageMs/(7*86400000)):null;
+    const contextLines=[];
+    if(baby.name)contextLines.push(`שם התינוק: ${baby.name}`);
+    if(ageWeeks!==null)contextLines.push(`גיל: ${ageWeeks} שבועות`);
+    if(lastFeed){
+      const sinceMin=Math.round((now-Number(lastFeed.ts))/60000);
+      contextLines.push(`האכלה אחרונה: לפני ${sinceMin} דקות`+(lastFeed.ml?` (${lastFeed.ml} מ"ל)`:""));
+    }
+    if(lastDiaper){
+      const sinceMin=Math.round((now-Number(lastDiaper.ts))/60000);
+      const dLabel=DIAPER_TYPES.find(d=>d.value===lastDiaper.subtype)?.label||"";
+      contextLines.push(`חיתול אחרון: לפני ${sinceMin} דקות`+(dLabel?` (${dLabel})`:""));
+    }
+    if(lastSleep?.durationMs)contextLines.push(`שנת לילה אחרונה: ${Math.round(lastSleep.durationMs/3600000*10)/10} שעות`);
+    const systemPrompt=`אתה עוזר הורים מנוסה ומבין בטיפול בתינוקות. עונה בעברית בצורה ברורה, חמה וידידותית.
+הקשר על התינוק:
+${contextLines.join("\n")}
+
+חשוב: אל תתן עצות רפואיות מחייבות. אם יש חשש רפואי, הפנה לרופא.`;
+    setState({_consultLoading:true,_consultErr:"",_consultAnswer:""});
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({system_instruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:q}]}],generationConfig:{maxOutputTokens:1024}})
+    }).then(r=>{
+      if(!r.ok)return r.json().then(e=>{throw new Error(e?.error?.message||`שגיאה ${r.status}`);});
+      return r.json();
+    }).then(data=>{
+      const answer=data.candidates?.[0]?.content?.parts?.[0]?.text||"לא התקבלה תשובה";
+      setState({_consultLoading:false,_consultAnswer:answer,_consultErr:""});
+    }).catch(err=>{
+      setState({_consultLoading:false,_consultErr:`שגיאה: ${err.message}`,_consultAnswer:""});
+    });
   }
   else if(action==="open-modal"){
     clearInterval(sleepTimer);clearInterval(feedTimer);
