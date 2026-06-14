@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-title" content="Baby Tracker"/>
 <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;Baby Tracker&quot;,&quot;short_name&quot;:&quot;Baby&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%232C6BAC&quot;,&quot;theme_color&quot;:&quot;%232C6BAC&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;lang&quot;:&quot;he&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;},{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}"/>
 <title>Baby Tracker</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍼</text></svg>"/>
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232C6BAC'/><text y='.9em' font-size='75' x='10'>🍼</text></svg>"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23FF9F66'/><rect x='38' y='8' width='24' height='14' rx='7' fill='rgba(255,255,255,0.65)'/><rect x='30' y='20' width='40' height='10' rx='5' fill='rgba(255,255,255,0.82)'/><rect x='24' y='30' width='52' height='62' rx='16' fill='white'/><rect x='34' y='55' width='32' height='7' rx='3.5' fill='rgba(255,159,102,0.4)'/><rect x='38' y='67' width='24' height='6' rx='3' fill='rgba(255,159,102,0.28)'/></svg>"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23FF9F66'/><rect x='38' y='8' width='24' height='14' rx='7' fill='rgba(255,255,255,0.65)'/><rect x='30' y='20' width='40' height='10' rx='5' fill='rgba(255,255,255,0.82)'/><rect x='24' y='30' width='52' height='62' rx='16' fill='white'/><rect x='34' y='55' width='32' height='7' rx='3.5' fill='rgba(255,159,102,0.4)'/><rect x='38' y='67' width='24' height='6' rx='3' fill='rgba(255,159,102,0.28)'/></svg>"/>
 <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Varela+Round&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -486,17 +486,23 @@ function renderSelector(){
     </div>
 
     <!-- Baby circles grid -->
+    <input type="file" id="selector-photo-input" accept="image/*" style="display:none"/>
     ${!state.addingBaby?`
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:28px;padding:0 20px;margin-bottom:32px">
       ${babies.map((b,i)=>`
         <div style="display:flex;flex-direction:column;align-items:center;gap:10px;animation:selector-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;animation-delay:${0.15+i*0.1}s;position:relative" class="baby-circle-btn">
-          <button data-action="select-baby" data-id="${b.id}" style="background:none;border:none;cursor:pointer;padding:0;position:relative;display:block">
-            <div style="width:130px;height:130px;border-radius:50%;background:linear-gradient(145deg,rgba(255,219,193,0.6),rgba(255,240,230,0.9));border:3px solid rgba(255,159,102,0.3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(200,149,108,0.2),0 2px 8px rgba(200,149,108,0.1);overflow:hidden;transition:transform 0.2s,box-shadow 0.2s">
-              ${b.photoData
-                ?`<img src="${b.photoData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
-                :`<span style="font-size:52px">${b.emoji||"👶"}</span>`}
-            </div>
-          </button>
+          <div style="position:relative">
+            <button data-action="select-baby" data-id="${b.id}" style="background:none;border:none;cursor:pointer;padding:0;display:block">
+              <div style="width:130px;height:130px;border-radius:50%;background:linear-gradient(145deg,rgba(255,219,193,0.6),rgba(255,240,230,0.9));border:3px solid rgba(255,159,102,0.3);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(200,149,108,0.2),0 2px 8px rgba(200,149,108,0.1);overflow:hidden;transition:transform 0.2s,box-shadow 0.2s">
+                ${b.photoData
+                  ?`<img src="${b.photoData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+                  :`<span style="font-size:52px">${b.emoji||"👶"}</span>`}
+              </div>
+            </button>
+            <button data-action="selector-pick-photo" data-id="${b.id}" style="position:absolute;bottom:4px;left:4px;width:34px;height:34px;border-radius:50%;background:#FF9F66;border:2.5px solid white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(255,159,102,0.45)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 15.2A3.2 3.2 0 1 0 12 8.8a3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+            </button>
+          </div>
           <button data-action="delete-baby" data-id="${b.id}" class="baby-delete-btn" style="position:absolute;top:4px;right:4px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.9);border:1.5px solid #FFDBC1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.2s;box-shadow:0 2px 6px rgba(0,0,0,0.1)">
             <span style="font-size:11px;color:${T.danger}">✕</span>
           </button>
@@ -1224,6 +1230,33 @@ function attachEvents(){
   document.querySelectorAll("select[data-val]").forEach(s=>{
     s.value=s.dataset.val;
   });
+  const spi=document.getElementById("selector-photo-input");
+  if(spi)spi.addEventListener("change",e=>{
+    const file=e.target.files[0];
+    const babyId=spi.dataset.babyId;
+    if(!file||!babyId)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const img=new Image();
+      img.onload=()=>{
+        const canvas=document.createElement("canvas");
+        const max=300;
+        const ratio=Math.min(max/img.width,max/img.height,1);
+        canvas.width=img.width*ratio;
+        canvas.height=img.height*ratio;
+        canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+        const compressed=canvas.toDataURL("image/jpeg",0.8);
+        saveBabyPhoto(babyId,compressed);
+        // update in-memory babies list
+        const b=state.babies.find(x=>x.id===babyId);
+        if(b)b.photoData=compressed;
+        setState({});
+      };
+      img.src=ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value="";
+  });
   const pi=document.getElementById("photo-input");
   if(pi)pi.addEventListener("change",e=>{
     const file=e.target.files[0];
@@ -1319,6 +1352,11 @@ function handleAction(e,el){
   else if(action==="pick-photo"){
     const inp=document.getElementById("photo-input");
     if(inp)inp.click();
+  }
+  else if(action==="selector-pick-photo"){
+    const babyId=el.dataset.id;
+    const inp=document.getElementById("selector-photo-input");
+    if(inp){inp.dataset.babyId=babyId;inp.click();}
   }
   else if(action==="toggle-night"){
     const _autoNight=new Date().getHours()>=21||new Date().getHours()<6;
