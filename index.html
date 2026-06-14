@@ -1579,6 +1579,7 @@ function handleAction(e,el){
     sb.getVaccines(baby.id).then(rows=>{
       const vacs=rows.map(r=>({id:r.id,name:r.name,date:r.date||"",done:!!r.done}));
       saveVaccines(baby.id,vacs);
+      setState({});
     }).catch(()=>{});
     sb.getLogs(baby.id).then(rows=>{
       const logs=rows.map(rowToLog);
