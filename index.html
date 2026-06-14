@@ -3,19 +3,27 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<meta name="theme-color" content="#2C6BAC"/>
+<meta name="theme-color" content="#FF9F66"/>
 <meta name="apple-mobile-web-app-title" content="Baby Tracker"/>
 <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;Baby Tracker&quot;,&quot;short_name&quot;:&quot;Baby&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%232C6BAC&quot;,&quot;theme_color&quot;:&quot;%232C6BAC&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;lang&quot;:&quot;he&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;},{&quot;src&quot;:&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%232C6BAC'/%3E%3Ctext y='.9em' font-size='75' x='10'%3E🍼%3C/text%3E%3C/svg%3E&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}"/>
 <title>Baby Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍼</text></svg>"/>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232C6BAC'/><text y='.9em' font-size='75' x='10'>🍼</text></svg>"/>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Varela+Round&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
-body{font-family:'Nunito',sans-serif;direction:rtl;background:#EEF6FD;min-height:100vh;overflow-x:hidden}
-button{font-family:'Nunito',sans-serif}
+body{font-family:'Varela Round','Quicksand',sans-serif;direction:rtl;background:#FFF9F5;min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;overscroll-behavior-y:contain}
+button{font-family:'Varela Round','Quicksand',sans-serif}
 button *{pointer-events:none}
-input,textarea{font-family:'Nunito',sans-serif}
+input,textarea{font-family:'Varela Round','Quicksand',sans-serif}
+.material-symbols-rounded{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;display:inline-block;line-height:1}
+.playful-card{background:#fff;border:2px solid #F5EFEA;box-shadow:0 6px 0px rgba(216,199,188,0.25);transition:transform 0.1s ease,box-shadow 0.1s ease}
+.playful-card:active{transform:translateY(2px);box-shadow:0 3px 0px rgba(216,199,188,0.25)}
+.nurture-bar-style{background:#FFF3C2;border:2px solid #F4D03F}
+.btn-pill-primary{border-radius:9999px;padding:12px 24px;font-weight:700;background:#FF9F66;color:#fff;border:none;transition:all 0.2s}
+@keyframes bounce-soft{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.timer-active-anim{animation:bounce-soft 2s infinite ease-in-out}
 ::-webkit-scrollbar{display:none}
 .sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:6px}
 .sync-dot.ok{background:#4CAF82}
@@ -29,19 +37,19 @@ input,textarea{font-family:'Nunito',sans-serif}
 @keyframes fadeSlideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .log-card-new{animation:fadeSlideIn .35s ease forwards}
 /* Today card highlight pulse */
-@keyframes todayGlow{0%,100%{box-shadow:0 2px 10px rgba(44,107,172,0.08)}50%{box-shadow:0 4px 20px rgba(44,107,172,0.22)}}
+@keyframes todayGlow{0%,100%{box-shadow:0 6px 0px rgba(216,199,188,0.25)}50%{box-shadow:0 8px 20px rgba(255,159,102,0.18)}}
 #bt-confirm{position:fixed;inset:0;background:rgba(10,30,60,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 #bt-confirm-box{background:#fff;border-radius:16px;padding:24px 20px;width:100%;max-width:320px;text-align:center;direction:rtl;font-family:'Nunito',sans-serif;box-shadow:0 8px 32px rgba(0,0,0,0.18)}
 #bt-confirm-msg{font-size:16px;font-weight:800;color:#3A4A5C;margin-bottom:20px;line-height:1.4}
 #bt-confirm-btns{display:flex;gap:10px}
 #bt-confirm-btns button{flex:1;padding:13px 0;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:15px;cursor:pointer}
-#bt-confirm-yes{background:#E05A5A;color:#fff}
+#bt-confirm-yes{background:#F06292;color:#fff;border-radius:10px}
 #bt-confirm-no{background:#f0f4f8;color:#3A4A5C}
 /* Desktop wrapper */
 #app-inner{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
 @media(min-width:600px){
-  body{background:#D6E9F8}
-  #app-inner{box-shadow:0 0 40px rgba(44,107,172,0.18);background:#EEF6FD}
+  body{background:#FFE4CC}
+  #app-inner{box-shadow:0 0 40px rgba(255,159,102,0.18);background:#FFF9F5}
 }
 </style>
 </head>
@@ -119,19 +127,19 @@ function rowToBaby(r){
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 const T={
-  blue:"#2C6BAC",blueMid:"#4A8FD4",blueLight:"#D6E9F8",bluePale:"#EEF6FD",
-  teal:"#3A9E8F",tealLight:"#D4F0EB",sky:"#E3F2FD",cream:"#F7FBFF",
-  green:"#4CAF82",greenLight:"#D8F3E8",lavender:"#E8EEF8",
-  slate:"#3A4A5C",muted:"#8FA3B8",danger:"#E05A5A",
+  blue:"#FF9F66",blueMid:"#F07840",blueLight:"#FFDBC1",bluePale:"#FFF9F5",
+  teal:"#7FC09C",tealLight:"#D7F3E3",sky:"#FFF3C2",cream:"#FFF9F5",
+  green:"#4CAF82",greenLight:"#D7F3E3",lavender:"#FFF3C2",
+  slate:"#413028",muted:"#6D5C54",danger:"#F06292",
   bear:"#C8956C",bearDark:"#A0714A",bearLight:"#F0D5C0"
 };
 
 const CAT={
-  feed:  {bg:T.bluePale, accent:T.blue,   border:T.blueLight,label:"האכלה"},
-  diaper:{bg:T.tealLight,accent:T.teal,   border:"#A8DDD5",  label:"חיתול"},
-  sleep: {bg:T.lavender, accent:"#5B6FA6",border:"#C5CEEA",  label:"שינה"},
-  med:   {bg:T.greenLight,accent:T.green, border:"#A8DFC4",  label:"תרופה/ויטמין"},
-  note:  {bg:T.sky,      accent:T.blueMid,border:T.blueLight,label:"הערה"},
+  feed:  {bg:"#FFF0E6", accent:"#FF9F66", border:"#FFDBC1",  label:"האכלה"},
+  diaper:{bg:"#D7F3E3", accent:"#7FC09C", border:"#A8DDD5",  label:"חיתול"},
+  sleep: {bg:"#FFF3C2", accent:"#C9A000", border:"#F4D03F",  label:"שינה"},
+  med:   {bg:"#FFE4EC", accent:"#F06292", border:"#FFAAC8",  label:"תרופה/ויטמין"},
+  note:  {bg:"#FFF9F5", accent:"#FF9F66", border:"#FFDBC1",  label:"הערה"},
 };
 
 const DIAPER_TYPES=[
@@ -231,9 +239,9 @@ function cloudsSVG(isNight){
     <circle cx="340" cy="15" r="1" fill="#fff" opacity="0.6"/>`;
   return`
     <defs><linearGradient id="dgr" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#BDDFF7"/>
-      <stop offset="60%" stop-color="#D6EEFC"/>
-      <stop offset="100%" stop-color="#EEF6FD"/>
+      <stop offset="0%" stop-color="#FFD4B0"/>
+      <stop offset="60%" stop-color="#FFE4CC"/>
+      <stop offset="100%" stop-color="#FFF9F5"/>
     </linearGradient></defs>
     <rect width="100%" height="200" fill="url(#dgr)"/>
     <g opacity="0.55"><ellipse cx="30" cy="45" rx="22" ry="14" fill="#fff"/><ellipse cx="52" cy="42" rx="18" ry="12" fill="#fff"/><ellipse cx="70" cy="46" rx="16" ry="11" fill="#fff"/><ellipse cx="50" cy="50" rx="30" ry="12" fill="#fff"/></g>
@@ -360,14 +368,16 @@ function setSyncStatus(s){state.syncStatus=s;const d=document.getElementById("sy
 // ── Init: load from Supabase ───────────────────────────────────────────────
 async function init(){
   setState({screen:"loading"});
-  try{
-    const rows=await sb.getBabies();
-    const babies=rows.map(rowToBaby);
+  const [result]=await Promise.allSettled([
+    sb.getBabies(),
+    new Promise(r=>setTimeout(r,3000))
+  ]);
+  if(result.status==="fulfilled"){
+    const babies=result.value.map(rowToBaby);
     store.saveBabies(babies);
     setState({screen:"selector",babies});
-  }catch(e){
-    // fallback to localStorage
-    console.warn("Supabase unavailable, using local:",e);
+  }else{
+    console.warn("Supabase unavailable, using local:",result.reason);
     setState({screen:"selector",babies:store.getBabies(),syncStatus:"err"});
   }
 }
@@ -382,14 +392,41 @@ function render(){
 }
 
 function renderLoading(){
-  return`<div style="min-height:100vh;background:linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
-    <div>${bearSVG(false,64)}</div>
-    <div style="font-size:18px;font-weight:800;color:${T.blue}">Baby Tracker</div>
-    <div style="font-size:13px;color:${T.muted}">מתחבר לענן...</div>
-    <div style="width:40px;height:4px;background:${T.blueLight};border-radius:4px;overflow:hidden">
-      <div style="width:40%;height:100%;background:${T.blue};border-radius:4px;animation:slide 1s infinite linear"></div>
+  return`
+  <style>
+    @keyframes splash-fade-in{0%{opacity:0;transform:scale(0.8) translateY(20px)}60%{opacity:1;transform:scale(1.04) translateY(-4px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+    @keyframes splash-logo-glow{0%,100%{filter:drop-shadow(0 0 0px rgba(255,159,102,0))}50%{filter:drop-shadow(0 0 18px rgba(255,159,102,0.6))}}
+    @keyframes splash-dots{0%,80%,100%{transform:scale(0.4);opacity:0.3}40%{transform:scale(1);opacity:1}}
+    @keyframes splash-bar{0%{width:0%}100%{width:100%}}
+    @keyframes splash-pulse-ring{0%{transform:scale(0.7);opacity:0.5}100%{transform:scale(1.4);opacity:0}}
+  </style>
+  <div style="min-height:100vh;background:linear-gradient(160deg,#FFE4CC 0%,#FFF3E0 50%,#FFF9F5 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;overflow:hidden;position:relative">
+    <!-- background blobs -->
+    <div style="position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(255,159,102,0.18) 0%,transparent 70%);top:-60px;right:-80px;pointer-events:none"></div>
+    <div style="position:absolute;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(127,192,156,0.15) 0%,transparent 70%);bottom:60px;left:-50px;pointer-events:none"></div>
+
+    <!-- Logo section -->
+    <div style="animation:splash-fade-in 0.8s cubic-bezier(0.34,1.56,0.64,1) both;animation-delay:0.1s;display:flex;flex-direction:column;align-items:center;gap:0;margin-bottom:48px">
+      <div style="position:relative;margin-bottom:20px">
+        <!-- pulse ring -->
+        <div style="position:absolute;inset:-18px;border-radius:50%;border:3px solid rgba(255,159,102,0.35);animation:splash-pulse-ring 2s ease-out infinite"></div>
+        <div style="position:absolute;inset:-10px;border-radius:50%;border:2px solid rgba(255,159,102,0.2);animation:splash-pulse-ring 2s ease-out infinite;animation-delay:0.5s"></div>
+        <!-- icon circle -->
+        <div style="width:110px;height:110px;border-radius:50%;background:linear-gradient(145deg,#FF9F66,#F07840);box-shadow:0 12px 40px rgba(255,159,102,0.45),0 4px 12px rgba(255,159,102,0.25);display:flex;align-items:center;justify-content:center;animation:splash-logo-glow 3s ease-in-out infinite">
+          <span style="font-size:52px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.15))">🍼</span>
+        </div>
+      </div>
+      <div style="font-size:32px;font-weight:900;color:#413028;font-family:'Quicksand',sans-serif;letter-spacing:-1px;line-height:1">Baby Tracker</div>
+      <div style="font-size:13px;color:#8a7060;font-weight:600;margin-top:6px;letter-spacing:0.03em">מעקב חכם לתינוק שלך ✨</div>
     </div>
-    <style>@keyframes slide{0%{margin-right:100%}100%{margin-right:-40%}}</style>
+
+    <!-- Loading indicator -->
+    <div style="animation:splash-fade-in 0.6s ease both;animation-delay:0.6s;display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div style="display:flex;gap:7px;align-items:center">
+        ${[0,1,2].map(i=>`<div style="width:9px;height:9px;border-radius:50%;background:#FF9F66;animation:splash-dots 1.2s ease-in-out infinite;animation-delay:${i*0.18}s"></div>`).join("")}
+      </div>
+      <div style="font-size:12px;color:#b09080;font-weight:600">מתחבר לענן...</div>
+    </div>
   </div>`;
 }
 
@@ -399,7 +436,7 @@ function renderSelector(){
   const syncColor=state.syncStatus==="ok"?T.green:state.syncStatus==="busy"?"#FFB300":T.danger;
   const syncLabel=state.syncStatus==="ok"?"מסונכרן":state.syncStatus==="busy"?"מסנכרן...":"לא מחובר (נתונים מקומיים)";
   return`
-  <div style="min-height:100vh;background:linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%);padding-bottom:40px;position:relative;overflow:hidden">
+  <div style="min-height:100vh;background:linear-gradient(180deg,#FFE4CC 0%,${T.cream} 100%);padding-bottom:40px;position:relative;overflow:hidden">
     <svg viewBox="0 0 390 180" style="position:absolute;top:0;left:0;width:100%;height:180px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
       ${cloudsSVG(false)}
     </svg>
@@ -417,14 +454,14 @@ function renderSelector(){
     </div>
     <div style="padding:0 14px">
       ${babies.map(b=>`
-        <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08);display:flex;align-items:center;gap:12px">
+        <div style="background:#fff;border-radius:20px;padding:16px;margin-bottom:12px;border:2px solid #F5EFEA;box-shadow:0 6px 0px rgba(216,199,188,0.25);display:flex;align-items:center;gap:12px">
           <div style="flex-shrink:0">${renderBabyAvatar(b,48,false)}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-weight:800;font-size:17px;color:${T.slate}">${b.name}</div>
+            <div style="font-weight:700;font-size:17px;color:${T.slate};font-family:'Quicksand',sans-serif">${b.name}</div>
             <div style="font-size:12px;color:${T.blue};font-weight:700;margin-top:1px">${b.dob?"בן "+calcAge(b.dob):'<span style="color:'+T.muted+'">תאריך לידה לא הוזן</span>'}</div>
           </div>
-          <button data-action="select-baby" data-id="${b.id}" style="background:${T.blue};color:#fff;border:none;border-radius:6px;padding:10px 16px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer">כנס</button>
-          <button data-action="delete-baby" data-id="${b.id}" style="background:#fff;border:1px solid #E0D0D0;border-radius:6px;padding:10px;cursor:pointer;display:flex">
+          <button data-action="select-baby" data-id="${b.id}" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:10px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 8px rgba(255,159,102,0.3)">כנס</button>
+          <button data-action="delete-baby" data-id="${b.id}" style="background:#fff;border:2px solid #F5EFEA;border-radius:12px;padding:10px;cursor:pointer;display:flex">
             ${svgIcon(ICONS.trash,15,T.danger)}
           </button>
         </div>
@@ -450,8 +487,8 @@ function renderSelector(){
           </div>
         </div>
       `:`
-        <button data-action="start-add" style="width:100%;padding:13px;background:rgba(255,255,255,0.8);border:1.5px dashed ${T.blueMid};border-radius:10px;font-family:inherit;font-weight:800;font-size:14px;cursor:pointer;color:${T.blue};margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
-          ${svgIcon(ICONS.plus,16,T.blue)} הוסף תינוק חדש
+        <button data-action="start-add" style="width:100%;padding:14px;background:rgba(255,255,255,0.8);border:2px dashed #FFDBC1;border-radius:20px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;color:#FF9F66;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+          ${svgIcon(ICONS.plus,16,"#FF9F66")} הוסף תינוק חדש
         </button>
       `}
     </div>
@@ -464,17 +501,15 @@ function renderDashboard(){
   const logs=state.logs;
   const autoNight=new Date().getHours()>=21||new Date().getHours()<6;
   const isNight=state.isNight!==null?state.isNight:autoNight;
-  const C=(extra="")=>isNight
-    ?`background:rgba(255,255,255,0.07);border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.1);${extra}`
-    :`background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;border:1px solid ${T.blueLight};box-shadow:0 2px 10px rgba(44,107,172,0.08);${extra}`;
   const tp=isNight?"#EEF6FD":T.slate;
   const ts=isNight?"rgba(200,218,232,0.55)":T.muted;
-  const bg=isNight?`linear-gradient(180deg,#0D1B2A 0%,#1B2B3C 100%)`:`linear-gradient(180deg,#BDDFF7 0%,${T.cream} 100%)`;
+  const bg=isNight?"#0D1B2A":"#FFF9F5";
+  const C=(extra="")=>isNight
+    ?`background:rgba(255,255,255,0.07);border-radius:16px;padding:16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.1);${extra}`
+    :`background:#fff;border-radius:20px;padding:16px;margin-bottom:12px;border:2px solid #F5EFEA;box-shadow:0 6px 0px rgba(216,199,188,0.25);${extra}`;
 
   const todayStart=new Date();todayStart.setHours(0,0,0,0);
-  const ystStart=new Date(todayStart);ystStart.setDate(ystStart.getDate()-1);
   const todayLogs=logs.filter(l=>l.ts>=todayStart.getTime());
-  const ystLogs=logs.filter(l=>l.ts>=ystStart.getTime()&&l.ts<todayStart.getTime());
   const feeds=todayLogs.filter(l=>l.type==="feed");
   const diapers=todayLogs.filter(l=>l.type==="diaper");
   const sleeps=todayLogs.filter(l=>l.type==="sleep");
@@ -483,155 +518,211 @@ function renderDashboard(){
   const age=calcAge(baby.dob);
   const catIcons={feed:ICONS.feed,diaper:ICONS.diaper,sleep:ICONS.moon,med:ICONS.med,note:ICONS.note};
 
-  // Feed alert: last feed across all logs
   const allFeeds=[...logs].filter(l=>l.type==="feed").sort((a,b)=>Number(b.ts)-Number(a.ts));
   const lastFeed=allFeeds[0];
   const sinceMs=lastFeed?Date.now()-Number(lastFeed.ts):null;
   const sinceHours=sinceMs!==null?Math.floor(sinceMs/3600000):null;
   const sinceMin=sinceMs!==null?Math.floor((sinceMs%3600000)/60000):null;
-  const sinceLabel=sinceMs===null?null
-    :sinceHours>0?`${sinceHours} שע׳ ו-${sinceMin} דק׳`
-    :`${sinceMin} דק׳`;
   const alertStage=sinceMs===null?null:sinceMs>=4*3600000?"red":sinceMs>=2*3600000?"orange":"green";
-  const alertColors={
-    green:{bg:"#E8F5E9",border:"#A8DFC4",text:"#2E7D32",icon:"🟢",title:"זמן מהאכלה האחרונה"},
-    orange:{bg:"#FFF0E6",border:"#FFCBA4",text:"#FF8C42",icon:"🍼",title:"זמן להאכלה"},
-    red:{bg:"#FDEAEA",border:"#F5C0C0",text:"#E05A5A",icon:"⚠️",title:"כבר הרבה זמן לא האכלת!"},
-  };
-  const showFeedAlert=alertStage!==null;
 
-  let tabContent="";
+  // Material Symbol helper
+  const ms=(name,fill=1,sz=22,color="currentColor")=>
+    `<span class="material-symbols-rounded" style="font-size:${sz}px;color:${color};font-variation-settings:'FILL' ${fill},'wght' 400,'GRAD' 0,'opsz' ${sz}">${name}</span>`;
+
+  // ── Sticky Header ──────────────────────────────────────────────────────
+  const header=`
+    <header style="position:sticky;top:0;z-index:50;background:${isNight?"rgba(13,27,42,0.96)":"rgba(255,255,255,0.93)"};backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:2px solid ${isNight?"rgba(255,255,255,0.08)":"#F0E8E2"};padding:10px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button data-action="go-back" title="החלף תינוק" style="background:none;border:2px solid ${isNight?"rgba(255,255,255,0.15)":"#F0E8E2"};border-radius:9999px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          ${ms("swap_horiz",0,20,isNight?"#FFD166":"#FF9F66")}
+        </button>
+        <button data-action="toggle-night" title="${isNight?"מצב יום":"מצב לילה"}" style="background:none;border:2px solid ${isNight?"rgba(255,255,255,0.15)":"#F0E8E2"};border-radius:9999px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          ${ms(isNight?"light_mode":"dark_mode",0,20,isNight?"#FFD166":"#FF9F66")}
+        </button>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:19px;font-weight:700;color:${tp};font-family:'Quicksand',sans-serif;line-height:1.2">${baby.name}</div>
+        ${state.editDob?`
+          <div style="display:flex;justify-content:center;gap:5px;margin-top:4px">
+            <input id="dob-edit-input" type="date" value="${state.dobInput}" style="padding:4px 8px;border-radius:8px;border:1.5px solid #FF9F66;font-size:11px;font-family:inherit;outline:none;color:${T.slate}"/>
+            <button data-action="save-dob" style="background:#FF9F66;color:#fff;border:none;border-radius:8px;padding:4px 8px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer">✓</button>
+            <button data-action="cancel-dob" style="background:none;border:1.5px solid #F0E8E2;border-radius:8px;padding:4px 6px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;color:${ts}">✕</button>
+          </div>`:`
+          <button data-action="edit-dob" style="background:none;border:none;cursor:pointer;font-family:inherit;font-size:11px;color:${ts};display:flex;align-items:center;gap:3px;margin:2px auto 0">
+            ${age?`בן ${age}`:"הוסף תאריך לידה"}
+          </button>`}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span id="sync-dot" class="sync-dot ${state.syncStatus}"></span>
+        <input type="file" id="photo-input" accept="image/*" style="display:none"/>
+        ${renderBabyAvatar(baby,44,true)}
+      </div>
+    </header>`;
+
+  // ── Home Tab ──────────────────────────────────────────────────────────
+  let mainContent="";
   if(state.tab==="home"){
-    tabContent=`
-      ${showFeedAlert?`
-        <div id="feed-alert" style="background:${alertColors[alertStage].bg};border:1.5px solid ${alertColors[alertStage].border};border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:22px">${alertColors[alertStage].icon}</span>
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:800;color:${alertColors[alertStage].text}">${alertColors[alertStage].title}</div>
-            <div style="font-size:12px;color:${alertColors[alertStage].text};opacity:0.85">${sinceLabel} מהאכלה האחרונה</div>
-          </div>
-          <button data-action="open-modal" data-type="feed" style="background:${alertColors[alertStage].text};color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:800;font-size:12px;cursor:pointer">רשום</button>
-        </div>`:""}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-        ${[
-          {icon:ICONS.bottle,val:feeds.length,sub:totalMl?totalMl+" מ״ל":"האכלות",color:T.blue,bg:T.bluePale,border:T.blueLight},
-          {icon:ICONS.diaper,val:diapers.length,sub:"חיתולים",color:T.teal,bg:T.tealLight,border:"#A8DDD5"},
-          {icon:ICONS.moon,val:totalSlMs?dur(totalSlMs):sleeps.length,sub:"שינה",color:"#5B6FA6",bg:T.lavender,border:"#C5CEEA"},
-        ].map(s=>`
-          <div style="${C("margin-bottom:0;padding:12px 6px;")}text-align:center">
-            <div style="display:flex;justify-content:center;margin-bottom:5px">
-              <div style="background:${s.bg};border-radius:6px;padding:6px;border:1px solid ${s.border}">${svgIcon(s.icon,16,s.color)}</div>
+    // Nurture Bar
+    const nTime=sinceMs===null?"--:--":sinceHours>0?`${String(sinceHours).padStart(2,"0")}:${String(sinceMin).padStart(2,"0")}`:`00:${String(sinceMin).padStart(2,"0")}`;
+    const nurtureBar=`
+      <div style="padding:12px 16px 0;position:sticky;top:66px;z-index:40">
+        <div style="background:${isNight?"rgba(255,243,194,0.1)":"#FFF3C2"};border:2px solid ${isNight?"rgba(244,208,63,0.25)":"#F4D03F"};border-radius:20px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <span style="font-size:11px;font-weight:700;color:${isNight?"rgba(255,243,194,0.65)":"#8a7300"};display:block;margin-bottom:3px">זמן מאז האכלה אחרונה</span>
+            <div style="display:flex;align-items:baseline;gap:5px">
+              <span style="font-size:28px;font-weight:700;color:${isNight?"#FFF3C2":"#5a4a00"};font-family:'Quicksand',sans-serif;letter-spacing:-0.5px">${nTime}</span>
+              <span style="font-size:13px;font-weight:700;color:${isNight?"#FFF3C2":"#5a4a00"}">שע׳</span>
             </div>
-            <div style="font-size:18px;font-weight:900;color:${s.color}">${s.val}</div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="width:10px;height:10px;border-radius:50%;background:${alertStage==="red"?"#F06292":alertStage==="orange"?"#FF9F66":"#7FC09C"}"></div>
+              <span style="font-size:9px;font-weight:700;color:${isNight?"#FFF3C2":"#8a7300"}">${alertStage==="red"?"דחוף":alertStage==="orange"?"שים לב":"תקין"}</span>
+            </div>
+            <button data-action="open-modal" data-type="feed" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:11px 18px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 10px rgba(255,159,102,0.4)">רשום האכלה</button>
+          </div>
+        </div>
+      </div>`;
+
+    // Stats Row
+    const statsRow=`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        ${[
+          {icon:"restaurant",val:feeds.length,sub:totalMl?totalMl+" מ״ל":"האכלות",color:"#FF9F66",bg:"#FFF0E6",border:"#FFDBC1"},
+          {icon:"child_care",val:diapers.length,sub:"חיתולים",color:"#7FC09C",bg:"#D7F3E3",border:"#A8DDD5"},
+          {icon:"bedtime",val:totalSlMs?dur(totalSlMs):sleeps.length,sub:"שינה",color:"#C9A000",bg:"#FFF3C2",border:"#F4D03F"},
+        ].map(s=>`
+          <div style="background:${isNight?"rgba(255,255,255,0.07)":"#fff"};border-radius:20px;padding:14px 6px;border:2px solid ${isNight?"rgba(255,255,255,0.08)":"#F5EFEA"};box-shadow:${isNight?"none":"0 6px 0px rgba(216,199,188,0.25)"};text-align:center">
+            <div style="display:flex;justify-content:center;margin-bottom:6px">
+              <div style="background:${s.bg};border-radius:12px;padding:8px;border:2px solid ${s.border}">${ms(s.icon,1,18,s.color)}</div>
+            </div>
+            <div style="font-size:20px;font-weight:700;color:${tp};font-family:'Quicksand',sans-serif">${s.val}</div>
             <div style="font-size:10px;color:${ts};font-weight:700">${s.sub}</div>
           </div>
         `).join("")}
-      </div>
+      </div>`;
 
-      <div style="${C()}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <div style="font-size:12px;font-weight:700;color:${ts};display:flex;align-items:center;gap:5px">${svgIcon(ICONS.plus,13,ts)} רשום עכשיו</div>
-            <button data-action="start-voice" id="voice-btn" style="background:${isNight?"rgba(255,255,255,0.1)":"#EEF6FD"};border:1.5px solid ${T.blueLight};border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;color:${T.blue}">
-              🎤 קולי
-            </button>
+    // Bento Quick Actions
+    const bento=`
+      <div style="font-size:11px;font-weight:700;color:${ts};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px">פעולות מהירות</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px">
+        <button data-action="open-modal" data-type="feed" style="background:${isNight?"rgba(255,240,230,0.08)":"#FFF0E6"};border:2px solid ${isNight?"rgba(255,219,193,0.15)":"#FFDBC1"};border-radius:24px;padding:20px 12px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;grid-row:span 2;box-shadow:${isNight?"none":"0 6px 0 rgba(216,199,188,0.25)"};min-height:164px">
+          <div style="width:62px;height:62px;border-radius:50%;background:${isNight?"rgba(255,219,193,0.2)":"#FFDBC1"};display:flex;align-items:center;justify-content:center">
+            ${ms("restaurant",1,32,"#FF9F66")}
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;color:#0F9D58;font-weight:700">הורד נתונים ←</span>
-            <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-              Sheets
-            </button>
+          <span style="font-weight:700;font-size:15px;color:${tp}">האכלה</span>
+        </button>
+        <button data-action="open-modal" data-type="diaper" style="background:${isNight?"rgba(215,243,227,0.07)":"#D7F3E3"};border:2px solid ${isNight?"rgba(168,221,213,0.15)":"#A8DDD5"};border-radius:20px;padding:14px 16px;cursor:pointer;font-family:inherit;display:flex;flex-direction:row;align-items:center;gap:12px;box-shadow:${isNight?"none":"0 4px 0 rgba(216,199,188,0.2)"}">
+          <div style="width:44px;height:44px;border-radius:14px;background:${isNight?"rgba(127,192,156,0.2)":"#B8EBD4"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${ms("child_care",1,22,"#7FC09C")}
           </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          ${Object.entries(CAT).map(([type,c])=>`
-            <button data-action="open-modal" data-type="${type}" style="background:${isNight?"rgba(255,255,255,0.05)":c.bg};border:1px solid ${isNight?"rgba(255,255,255,0.08)":c.border};border-radius:8px;padding:12px 10px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:9px">
-              <div style="background:${isNight?"rgba(255,255,255,0.1)":"#fff"};border-radius:6px;padding:6px;border:1px solid ${isNight?"rgba(255,255,255,0.08)":c.border};flex-shrink:0">
-                ${svgIcon(catIcons[type],16,c.accent)}
+          <span style="font-weight:700;font-size:14px;color:${tp}">חיתול</span>
+        </button>
+        <button data-action="open-modal" data-type="sleep" style="background:${isNight?"rgba(255,243,194,0.07)":"#FFF3C2"};border:2px solid ${isNight?"rgba(244,208,63,0.15)":"#F4D03F"};border-radius:20px;padding:14px 16px;cursor:pointer;font-family:inherit;display:flex;flex-direction:row;align-items:center;gap:12px;box-shadow:${isNight?"none":"0 4px 0 rgba(216,199,188,0.2)"}">
+          <div style="width:44px;height:44px;border-radius:14px;background:${isNight?"rgba(255,229,102,0.15)":"#FFE566"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${ms("bedtime",1,22,"#C9A000")}
+          </div>
+          <span style="font-weight:700;font-size:14px;color:${tp}">שינה</span>
+        </button>
+        <button data-action="open-modal" data-type="med" style="background:${isNight?"rgba(255,228,236,0.07)":"#FFE4EC"};border:2px solid ${isNight?"rgba(255,170,200,0.15)":"#FFAAC8"};border-radius:20px;padding:14px 16px;cursor:pointer;font-family:inherit;display:flex;flex-direction:row;align-items:center;gap:12px;grid-column:span 2;box-shadow:${isNight?"none":"0 4px 0 rgba(216,199,188,0.2)"}">
+          <div style="width:44px;height:44px;border-radius:14px;background:${isNight?"rgba(240,98,146,0.15)":"#FFB8D0"};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${ms("medical_services",1,22,"#F06292")}
+          </div>
+          <span style="font-weight:700;font-size:14px;color:${tp}">תרופה או ויטמין</span>
+        </button>
+      </div>`;
+
+    // Timeline
+    const msMap={feed:"restaurant",diaper:"child_care",sleep:"bedtime",med:"medical_services",note:"note_alt"};
+    const renderTL=(l,active=false)=>{
+      const c=CAT[l.type]||CAT.note;
+      let sub="";
+      if(l.type==="feed"){
+        const types=l.subtype?l.subtype.split(",").filter(Boolean):[];
+        const fl=types.map(s=>FEED_TYPES.find(f=>f.value===s)?.label||s).join(" + ");
+        const parts=[];if(fl)parts.push(fl);if(l.ml)parts.push(l.ml+" מ״ל");
+        sub=parts.join(" • ");
+      }else if(l.type==="diaper"){sub=DIAPER_TYPES.find(d=>d.value===l.subtype)?.label||"";}
+      else if(l.type==="med"){sub=[l.medName,l.medDose].filter(Boolean).join(" — ");}
+      else if(l.type==="sleep"){sub=active?"התחיל ב-"+fmtTime(l.ts)+(state.elapsed?" • "+dur(state.elapsed):""):l.durationMs?dur(l.durationMs):"";}
+      if(l.note&&!active)sub=sub?sub+" • "+l.note:l.note;
+      return`
+        <div style="position:relative;padding-right:44px;margin-bottom:14px">
+          <div style="position:absolute;right:13px;top:18px;width:12px;height:12px;border-radius:50%;background:${c.accent};border:3px solid ${isNight?"#0D1B2A":"#FFF9F5"};z-index:1${active?";animation:bounce-soft 2s infinite ease-in-out":""}"></div>
+          <div style="background:${active&&l.type==="sleep"?(isNight?"rgba(255,243,194,0.12)":"#FFF3C2"):(isNight?"rgba(255,255,255,0.06)":"#fff")};border:2px solid ${active&&l.type==="sleep"?"#F4D03F":(isNight?"rgba(255,255,255,0.08)":"#F5EFEA")};border-radius:20px;padding:13px 14px;display:flex;align-items:center;gap:10px;box-shadow:${isNight?"none":"0 4px 0 rgba(216,199,188,0.2)"}">
+            <span style="font-size:11px;font-weight:700;color:${ts};flex-shrink:0;min-width:34px">${fmtTime(l.ts)}</span>
+            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+              <div style="width:40px;height:40px;border-radius:12px;background:${c.bg};border:1.5px solid ${c.border};display:flex;align-items:center;justify-content:center;flex-shrink:0">${ms(msMap[l.type]||"note_alt",1,18,c.accent)}</div>
+              <div style="min-width:0">
+                <div style="font-weight:700;font-size:13px;color:${tp}">${c.label}${active?" (בתהליך)":""}</div>
+                ${sub?`<div style="font-size:11px;color:${ts};margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sub}</div>`:""}
               </div>
-              <span style="font-weight:700;font-size:13px;color:${isNight?"rgba(238,246,253,0.9)":T.slate}">${c.label}</span>
-            </button>
-          `).join("")}
-        </div>
+            </div>
+            ${active?`<button data-action="sleep-stop" style="background:#C9A000;color:#fff;border:none;border-radius:9999px;padding:7px 13px;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer;flex-shrink:0">עצור</button>`:`
+              <div style="display:flex;gap:5px;flex-shrink:0">
+                <button data-action="open-edit" data-id="${l.id}" style="background:${isNight?"rgba(255,255,255,0.08)":c.bg};border:1.5px solid ${c.border};border-radius:10px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px">✏️</button>
+                <button data-action="delete-log" data-id="${l.id}" style="background:${isNight?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.9)"};border:1.5px solid #F0E8E2;border-radius:10px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:10px;color:${ts}">✕</button>
+              </div>`}
+          </div>
+        </div>`;
+    };
+    const tlItems=[
+      ...(state.sleeping?[{id:"__active__",type:"sleep",ts:state.sleepStart||Date.now(),note:"",subtype:"tracked"}]:[]),
+      ...[...todayLogs].sort((a,b)=>Number(b.ts)-Number(a.ts))
+    ];
+    const timeline=`
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="font-size:11px;font-weight:700;color:${ts};text-transform:uppercase;letter-spacing:0.08em">ציר זמן היום</h2>
+        <button data-action="set-tab" data-tab="history" style="background:none;border:none;cursor:pointer;color:#FF9F66;font-family:inherit;font-weight:700;font-size:13px">ראה הכל</button>
       </div>
+      <div style="position:relative">
+        <div style="position:absolute;right:19px;top:0;bottom:0;border-right:2px dashed ${isNight?"rgba(216,199,188,0.2)":"#D8C7BC"};z-index:0"></div>
+        ${tlItems.length===0?`<div style="text-align:center;padding:28px 0"><div style="font-size:13px;font-weight:700;color:${ts}">עדיין לא רשמת היום</div><div style="font-size:11px;color:${ts};margin-top:4px;opacity:0.7">לחץ על אחד הכפתורים למעלה</div></div>`:tlItems.map((l,i)=>renderTL(l,i===0&&state.sleeping&&l.id==="__active__")).join("")}
+      </div>`;
 
-      ${todayLogs.length>0||ystLogs.length>0?
-        groupByDay([...todayLogs,...ystLogs]).map(day=>renderDayCard(day,C,ts,tp,catIcons,isNight)).join("")
-        :""}
-      ${todayLogs.length===0&&ystLogs.length===0?`
-        <div style="text-align:center;padding:32px 0;color:${ts}">
-          <div style="display:flex;justify-content:center;margin-bottom:10px;opacity:0.35">${bearSVG(false,46)}</div>
-          <div style="font-weight:700;font-size:14px;color:${tp}">עדיין לא רשמת היום</div>
-          <div style="font-size:12px;margin-top:3px">לחץ על אחד הכפתורים למעלה</div>
-        </div>`:""}`;
-  } else if(state.tab==="charts"){
-    tabContent=renderCharts(logs,isNight,ts,C);
-  } else {
+    mainContent=nurtureBar+`<div style="padding:12px 16px 8px">${statsRow}${bento}${timeline}</div>`;
+
+  }else if(state.tab==="charts"){
+    mainContent=`<div style="padding:14px">${renderCharts(logs,isNight,ts,C)}</div>`;
+  }else{
     const allDays=groupByDay(logs);
-    tabContent=`
+    mainContent=`<div style="padding:0 14px">
       ${logs.length===0?`<div style="${C()}text-align:center;padding:16px;font-size:13px;color:${ts}">אין רשומות עדיין</div>`:""}
       ${allDays.map(day=>renderDayCard(day,C,ts,tp,catIcons,isNight)).join("")}
-      <button data-action="export-csv" style="background:${T.blueMid};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">
+      <button data-action="export-csv" style="background:#FF9F66;color:#fff;border:none;border-radius:9999px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px;box-shadow:0 4px 12px rgba(255,159,102,0.3)">
         ${svgIcon(ICONS.export,15,"#fff")} ייצוא ל-CSV
       </button>
-      <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px">
+      <button data-action="export-sheets" style="background:#0F9D58;color:#fff;border:none;border-radius:9999px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;box-shadow:0 4px 12px rgba(15,157,88,0.25)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
         פתח ב-Google Sheets
       </button>
-      ${logs.length>0?`<button data-action="clear-logs" style="background:#fff;color:${T.danger};border:1.5px solid ${T.danger};border-radius:6px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">${svgIcon(ICONS.trash,15,T.danger)} מחק את כל הנתונים</button>`:""}`;
+      ${logs.length>0?`<button data-action="clear-logs" style="background:#fff;color:${T.danger};border:2px solid #FFAAC8;border-radius:9999px;padding:13px 0;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px">${svgIcon(ICONS.trash,15,T.danger)} מחק את כל הנתונים</button>`:""}
+    </div>`;
   }
 
-  return`
-  <div style="min-height:100vh;background:${bg};padding-bottom:80px;position:relative;overflow-x:hidden">
-    <svg viewBox="0 0 390 200" style="position:absolute;top:0;left:0;width:100%;height:200px;pointer-events:none" preserveAspectRatio="xMidYMid slice">
-      ${cloudsSVG(isNight)}
-    </svg>
-    <div style="position:relative;padding:50px 14px 0">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <button data-action="go-back" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 12px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer;color:${tp};display:flex;align-items:center;gap:6px">
-          ${svgIcon(ICONS.swap,14,isNight?"#8AAAC8":T.blue)} החלף
-        </button>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span id="sync-dot" class="sync-dot ${state.syncStatus}"></span>
-          <button data-action="toggle-night" style="background:${isNight?"rgba(255,255,255,0.09)":"rgba(255,255,255,0.85)"};border:1px solid ${isNight?"rgba(255,255,255,0.12)":T.blueLight};border-radius:6px;padding:9px 11px;cursor:pointer;display:flex;align-items:center;gap:6px;color:${tp};font-family:inherit;font-weight:700;font-size:12px">
-            ${svgIcon(isNight?ICONS.sun:ICONS.moon,14,isNight?"#FFD166":T.blue)}${isNight?"יום":"לילה"}
-          </button>
-        </div>
-      </div>
-
-      <div style="${C("margin-bottom:14px;")}">
-        <div style="display:flex;align-items:center;gap:14px">
-          <input type="file" id="photo-input" accept="image/*" style="display:none"/>
-          ${renderBabyAvatar(baby,58,true)}
-          <div style="flex:1">
-            <div style="font-weight:900;font-size:19px;color:${tp};line-height:1.1">${baby.name}</div>
-            ${age?`<div style="font-size:13px;color:${T.blue};font-weight:700;margin-top:3px">בן ${age}</div>`:""}
-            ${state.editDob?`
-              <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-                <input id="dob-edit-input" type="date" value="${state.dobInput}" style="padding:6px 10px;border-radius:6px;border:1.5px solid ${T.blue};font-size:12px;font-family:inherit;flex:1"/>
-                <button data-action="save-dob" style="background:${T.blue};color:#fff;border:none;border-radius:6px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✓</button>
-                <button data-action="cancel-dob" style="background:#fff;color:${T.muted};border:1.5px solid ${T.muted};border-radius:6px;padding:6px 8px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer">✕</button>
-              </div>`:`
-              <button data-action="edit-dob" style="background:none;border:none;padding:0;margin-top:3px;cursor:pointer;display:flex;align-items:center;gap:4px;color:${ts};font-size:11px;font-family:inherit">
-                ${svgIcon(ICONS.edit,11,ts)}${baby.dob?new Date(baby.dob).toLocaleDateString("he-IL"):"הוסף תאריך לידה"}
-              </button>`}
-          </div>
-        </div>
-        <div style="font-size:11px;color:${ts};margin-top:10px;padding-top:10px;border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":"#E4EFF8"}">${fmtDate(Date.now())}</div>
-      </div>
-    </div>
-
-    <div style="padding:0 14px">${tabContent}</div>
-
-    <div style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"#0D1B2A":"#fff"};border-top:1px solid ${isNight?"rgba(255,255,255,0.07)":T.blueLight};display:flex;justify-content:space-around;padding:8px 0 18px;z-index:50">
-      ${[{id:"home",icon:ICONS.home,label:"בית"},{id:"charts",icon:ICONS.chart,label:"גרפים"},{id:"history",icon:ICONS.history,label:"היסטוריה"}].map(t=>`
-        <button data-action="set-tab" data-tab="${t.id}" style="background:none;border:none;cursor:pointer;font-family:inherit;text-align:center;padding:4px 16px;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:${state.tab===t.id?1:0.32}">
-          ${svgIcon(t.icon,21,state.tab===t.id?T.blue:tp)}
-          <div style="font-size:10px;font-weight:700;color:${tp}">${t.label}</div>
+  // Bottom Nav with Material Symbols
+  const nav=`
+    <nav style="position:fixed;bottom:0;left:0;right:0;background:${isNight?"rgba(13,27,42,0.97)":"rgba(255,255,255,0.97)"};backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:2px solid ${isNight?"rgba(255,255,255,0.07)":"#F0E8E2"};display:flex;justify-content:space-around;align-items:center;padding:10px 16px 22px;z-index:50;border-radius:24px 24px 0 0">
+      ${[{id:"home",icon:"home",label:"בית"},{id:"charts",icon:"insights",label:"גרפים"},{id:"history",icon:"history",label:"היסטוריה"}].map(t=>`
+        <button data-action="set-tab" data-tab="${t.id}" style="background:${state.tab===t.id?"#FF9F66":"none"};border:none;cursor:pointer;font-family:inherit;text-align:center;padding:${state.tab===t.id?"8px 22px":"8px 14px"};border-radius:9999px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:${state.tab===t.id?"0 4px 12px rgba(255,159,102,0.35)":"none"}">
+          ${ms(t.icon,state.tab===t.id?1:0,22,state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070"))}
+          <div style="font-size:10px;font-weight:700;color:${state.tab===t.id?"#fff":(isNight?"rgba(255,255,255,0.4)":"#A08070")}">${t.label}</div>
         </button>
       `).join("")}
-    </div>
+    </nav>`;
+
+  // FAB
+  const fab=state.tab==="home"?`
+    <button data-action="start-voice" id="voice-btn" style="position:fixed;left:20px;bottom:88px;width:56px;height:56px;background:#FF9F66;border:none;border-radius:9999px;box-shadow:0 8px 20px rgba(255,159,102,0.45);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:49">
+      ${ms("mic",0,28,"#fff")}
+    </button>`:"";
+
+  return`
+  <div style="min-height:100vh;background:${bg};padding-bottom:80px">
+    ${header}
+    <main>${mainContent}</main>
+    ${fab}
+    ${nav}
     ${state.modal?renderModal(state.modal,isNight):""}
     ${state.editingLog?renderEditModal(state.editingLog):""}
   </div>`;
@@ -812,8 +903,8 @@ function renderEditModal(l){
   }
   return`
     <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:300;display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:#F7FBFF;border-radius:14px 14px 0 0;width:100%;max-width:500px;direction:rtl;max-height:92vh;overflow-y:auto">
-        <div style="background:${c.bg};border-radius:14px 14px 0 0;padding:14px 18px;border-bottom:1px solid ${c.border};display:flex;justify-content:space-between;align-items:center">
+      <div style="background:#FFF9F5;border-radius:24px 24px 0 0;width:100%;max-width:500px;direction:rtl;max-height:92vh;overflow-y:auto">
+        <div style="background:${c.bg};border-radius:24px 24px 0 0;padding:14px 18px;border-bottom:2px solid ${c.border};display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:16px;font-weight:800;color:${c.accent}">✏️ עריכת ${c.label}</span>
           <button data-action="close-edit" style="background:rgba(255,255,255,0.7);border:1px solid ${c.border};border-radius:6px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:${T.muted};font-size:14px">✕</button>
         </div>
@@ -827,7 +918,7 @@ function renderEditModal(l){
             <label style="display:block;margin-bottom:5px;font-size:12px;color:${T.muted};font-weight:700">הערה</label>
             <textarea id="edit-note" style="width:100%;padding:11px 12px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:14px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;height:64px;resize:none">${l.note||""}</textarea>
           </div>
-          <button data-action="save-edit" data-id="${l.id}" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
+          <button data-action="save-edit" data-id="${l.id}" style="background:${c.accent};color:#fff;border:none;border-radius:9999px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
             ${svgIcon(ICONS.save,16,"#fff")} שמור שינויים
           </button>
         </div>
@@ -872,9 +963,9 @@ function renderDayCard(day,C,ts,tp,catIcons,isNight){
 
   // Today card gets special styling
   const todayStyle=day.isToday&&!isNight
-    ?`background:linear-gradient(135deg,#EEF6FD 0%,#D6E9F8 100%);border:1.5px solid ${T.blueMid};animation:todayGlow 3s ease infinite;`
+    ?`background:linear-gradient(135deg,#FFF9F5 0%,#FFE4CC 100%);border:2px solid #FF9F66 !important;`
     :day.isToday&&isNight
-    ?`background:rgba(74,143,212,0.15);border:1.5px solid rgba(74,143,212,0.4);`
+    ?`background:rgba(255,159,102,0.12);border:1.5px solid rgba(255,159,102,0.4);`
     :"";
 
   return`
@@ -887,9 +978,9 @@ function renderDayCard(day,C,ts,tp,catIcons,isNight){
           <div style="font-size:11px;color:${ts};margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summaryParts.join(" · ")||"אין רשומות"}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
-          ${day.feeds>0?`<span style="background:${T.bluePale};color:${T.blue};border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">🍼${day.feeds}</span>`:""}
-          ${day.diapers>0?`<span style="background:${T.tealLight};color:${T.teal};border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">👶${day.diapers}</span>`:""}
-          ${day.sleeps>0?`<span style="background:${T.lavender};color:#5B6FA6;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800">🌙${day.sleeps}</span>`:""}
+          ${day.feeds>0?`<span style="background:#FFF0E6;color:#FF9F66;border-radius:9999px;padding:3px 9px;font-size:11px;font-weight:700">🍼${day.feeds}</span>`:""}
+          ${day.diapers>0?`<span style="background:#D7F3E3;color:#7FC09C;border-radius:9999px;padding:3px 9px;font-size:11px;font-weight:700">👶${day.diapers}</span>`:""}
+          ${day.sleeps>0?`<span style="background:#FFF3C2;color:#C9A000;border-radius:9999px;padding:3px 9px;font-size:11px;font-weight:700">🌙${day.sleeps}</span>`:""}
         </div>
         <div style="color:${ts};font-size:14px;flex-shrink:0">${isOpen?"▲":"▼"}</div>
       </button>
@@ -914,17 +1005,17 @@ function renderCharts(logs,isNight,ts,C){
   ].map(ch=>{
     const data=last7.map(d=>({day:d.day,val:d[ch.key]}));
     const max=Math.max(...data.map(d=>d.val),1);
-    const W=300,H=88,gap=4,bw=(W-gap*(data.length+1))/data.length;
+    const W=300,H=88,PAD=14,gap=4,bw=(W-gap*(data.length+1))/data.length;
     let svg="";
     if(ch.type==="bar"){
       svg=data.map((d,i)=>{
-        const bh=Math.max((d.val/max)*H,d.val>0?3:0),x=gap+i*(bw+gap),y=H-bh;
+        const bh=Math.max((d.val/max)*(H-PAD),d.val>0?3:0),x=gap+i*(bw+gap),y=H-bh;
         return`<rect x="${x}" y="${d.val>0?y:H}" width="${bw}" height="${d.val>0?bh:2}" rx="3" fill="${d.val>0?ch.color:"#E0EDF7"}"/>
           ${d.val>0?`<text x="${x+bw/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${d.val}</text>`:""}
           <text x="${x+bw/2}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${d.day}</text>`;
       }).join("");
     }else{
-      const padX=14,pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:H-(d.val/max)*H,val:d.val,day:d.day}));
+      const padX=14,pts=data.map((d,i)=>({x:padX+i*(W-padX*2)/(data.length-1||1),y:PAD+(1-(d.val/max))*(H-PAD),val:d.val,day:d.day}));
       svg=`<path d="${pts.map((p,i)=>`${i===0?"M":"L"}${p.x},${p.y}`).join(" ")}" fill="none" stroke="${ch.color}" stroke-width="2" stroke-linejoin="round"/>`;
       svg+=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="${ch.color}"/>${p.val>0?`<text x="${p.x}" y="${p.y-8}" text-anchor="middle" font-size="9" fill="${ch.color}" font-weight="700">${p.val}</text>`:""}<text x="${p.x}" y="${H+16}" text-anchor="middle" font-size="10" fill="${T.muted}">${p.day}</text>`).join("");
     }
@@ -1020,8 +1111,8 @@ function renderModal(type,isNight){
   }
   return`
     <div style="position:fixed;inset:0;background:rgba(10,30,60,0.6);z-index:200;display:flex;align-items:flex-end;justify-content:center">
-      <div style="background:#F7FBFF;border-radius:14px 14px 0 0;width:100%;max-width:500px;direction:rtl;max-height:92vh;overflow-y:auto">
-        <div style="background:${c.bg};border-radius:14px 14px 0 0;padding:16px 18px 14px;border-bottom:1px solid ${c.border}">
+      <div style="background:#FFF9F5;border-radius:24px 24px 0 0;width:100%;max-width:500px;direction:rtl;max-height:92vh;overflow-y:auto">
+        <div style="background:${c.bg};border-radius:24px 24px 0 0;padding:16px 18px 14px;border-bottom:2px solid ${c.border}">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div style="display:flex;align-items:center;gap:10px">
               <div style="background:#fff;border-radius:6px;padding:7px;border:1px solid ${c.border}">${svgIcon(catIcon[type],20,c.accent)}</div>
@@ -1039,7 +1130,7 @@ function renderModal(type,isNight){
               style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;outline:none"/>
           </div>
           <textarea id="modal-note" placeholder="הערה (אופציונלי)..." style="width:100%;padding:13px 14px;border-radius:6px;border:1.5px solid #C8DAE8;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;height:68px;resize:none;margin-bottom:14px">${state.note}</textarea>
-          <button data-action="save-log" style="background:${c.accent};color:#fff;border:none;border-radius:6px;padding:15px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px">
+          <button data-action="save-log" style="background:${c.accent};color:#fff;border:none;border-radius:9999px;padding:16px 0;font-family:inherit;font-weight:700;font-size:16px;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
             ${svgIcon(ICONS.save,16,"#fff")} שמור
           </button>
         </div>
@@ -1124,7 +1215,7 @@ function btConfirm(msg, yesLabel, onYes, danger=true){
       <div id="bt-confirm-msg">${msg}</div>
       <div id="bt-confirm-btns">
         <button id="bt-confirm-no" style="pointer-events:auto">ביטול</button>
-        <button id="bt-confirm-yes" style="background:${danger?"#E05A5A":"#2C6BAC"};color:#fff;pointer-events:auto">${yesLabel}</button>
+        <button id="bt-confirm-yes" style="background:${danger?"#F06292":"#FF9F66"};color:#fff;pointer-events:auto;border-radius:10px">${yesLabel}</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
@@ -1186,7 +1277,8 @@ function handleAction(e,el){
     if(inp)inp.click();
   }
   else if(action==="toggle-night"){
-    setState({isNight:!(state.isNight!==null?state.isNight:autoNight)});
+    const _autoNight=new Date().getHours()>=21||new Date().getHours()<6;
+    setState({isNight:!(state.isNight!==null?state.isNight:_autoNight)});
   }
   else if(action==="set-tab")setState({tab:el.dataset.tab});
   else if(action==="open-modal"){
@@ -1583,7 +1675,7 @@ function showVoiceUI(status,transcript=""){
     el.addEventListener("click",e=>e.stopPropagation());
     document.body.appendChild(el);
   }
-  const colors={listening:"#2C6BAC",processing:"#FF8C42",error:"#E05A5A",done:"#4CAF82"};
+  const colors={listening:"#FF9F66",processing:"#F07840",error:"#F06292",done:"#7FC09C"};
   const labels={listening:"מקשיב...",processing:"מעבד...",error:"לא הצלחתי להבין",done:"הבנתי!"};
   el.innerHTML=`
     <div style="background:#fff;border-radius:20px;width:100%;max-width:300px;direction:rtl;font-family:'Nunito',sans-serif;padding:28px 20px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
@@ -1655,7 +1747,7 @@ function showInstallBanner(){
   if(localStorage.getItem("bt_install_dismissed"))return;
   const b=document.createElement("div");
   b.id="install-banner";
-  b.style.cssText="position:fixed;bottom:90px;left:50%;transform:translateX(50%);width:calc(100% - 28px);max-width:452px;background:#2C6BAC;color:#fff;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-family:'Nunito',sans-serif;direction:rtl";
+  b.style.cssText="position:fixed;bottom:90px;left:50%;transform:translateX(50%);width:calc(100% - 28px);max-width:452px;background:#FF9F66;color:#fff;border-radius:20px;padding:14px 16px;display:flex;align-items:center;gap:12px;z-index:999;box-shadow:0 6px 20px rgba(255,159,102,0.35);font-family:'Varela Round',sans-serif;direction:rtl";
   b.innerHTML=`<span style="font-size:26px">🍼</span><div style="flex:1"><div style="font-weight:800;font-size:14px">Baby Tracker</div><div style="font-size:12px;opacity:0.85">הוסף למסך הבית לגישה מהירה</div></div><button onclick="doInstall()" style="background:#fff;color:#2C6BAC;border:none;border-radius:8px;padding:8px 14px;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer">התקן</button><button onclick="dismissInstall()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px">✕</button>`;
   document.body.appendChild(b);
 }
