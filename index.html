@@ -2042,11 +2042,21 @@ function parseVoiceCommand(text){
     if(t.includes("מוצקים"))types.push("solids");
     if(types.length===0)types.push("expressed"); // default
     subtype=types.join(",");
-    // detect ml
-    const mlMatch=t.match(/(\S+(?:\s+\S+)?)\s*מ[״"']?ל/);
+    // detect ml — broad pattern covering all quote variants + מיליליטר
+    const ML_RE=/(\S+(?:\s+\S+)?)\s*(?:מיליליטר|מיליל|מ[״"“”'ʺ׳]?ל\b)/;
+    const mlMatch=t.match(ML_RE);
     if(mlMatch)ml=parseHebNum(mlMatch[1]);
     if(!ml){
-      // try numbers anywhere
+      // digit directly before ml keyword
+      const digitMl=t.match(/(\d+)\s*(?:מיליליטר|מיליל|מ.?ל\b)/);
+      if(digitMl)ml=parseInt(digitMl[1]);
+    }
+    if(!ml){
+      // any standalone 2-3 digit number in feed context (likely ml)
+      const anyNum=t.match(/\b(\d{2,3})\b/);
+      if(anyNum){const n=parseInt(anyNum[1]);if(n>=5&&n<=300)ml=n;}
+    }
+    if(!ml){
       for(const[k,v] of Object.entries(HEB_NUMS)){
         if(t.includes(k)&&v>0){ml=v;break;}
       }
