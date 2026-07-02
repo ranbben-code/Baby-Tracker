@@ -150,6 +150,9 @@ async function sbFetch(path,opts={}){
   return t?JSON.parse(t):[];
 }
 
+const ADMIN_EMAIL="ranbben@gmail.com";
+function isAdmin(){return _currentUser?.email===ADMIN_EMAIL;}
+
 const sb={
   getBabies:()=>sbFetch("babies?select=*&order=created_at.asc"),
   upsertBaby:b=>sbFetch("babies",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(b)}),
@@ -161,6 +164,13 @@ const sb={
   getVaccines:bid=>sbFetch("vaccines?baby_id=eq."+bid+"&select=*&order=date.asc"),
   upsertVaccine:v=>sbFetch("vaccines",{method:"POST",prefer:"resolution=merge-duplicates,return=representation",body:JSON.stringify(v)}),
   deleteVaccine:id=>sbFetch("vaccines?id=eq."+id,{method:"DELETE",prefer:""}),
+  upsertProfile:p=>sbFetch("user_profiles",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",body:JSON.stringify(p)}),
+  adminGetProfiles:()=>sbFetch("user_profiles?select=*&order=created_at.desc"),
+  adminGetBabies:()=>sbFetch("babies?select=*&order=created_at.desc"),
+  adminGetLogs:()=>sbFetch("logs?select=id,baby_id,type,ts&order=ts.desc&limit=1000"),
+  adminGetVaccines:()=>sbFetch("vaccines?select=id,baby_id&limit=1000"),
+  adminGetReports:()=>sbFetch("bug_reports?select=*&order=created_at.desc&limit=50"),
+  submitReport:(msg)=>sbFetch("bug_reports",{method:"POST",prefer:"return=minimal",body:JSON.stringify({user_id:_currentUser?.id||null,email:_currentUser?.email||null,message:msg})}),
 };
 
 // map app log → db row
@@ -512,6 +522,7 @@ async function init(){
   _currentUser=session.user;
   await processPendingInvite(session.user.id);
   await migrateUnownedData(session.user.id);
+  sb.upsertProfile({id:session.user.id,email:session.user.email,display_name:session.user.user_metadata?.full_name||"",last_seen:new Date().toISOString()}).catch(()=>{});
   const [result]=await Promise.allSettled([
     sb.getBabies(),
     new Promise(r=>setTimeout(r,1500))
@@ -571,11 +582,172 @@ function renderLogin(){
   </div>`;
 }
 
+// ── Admin Dashboard ────────────────────────────────────────────────────────
+let _adminData={profiles:[],babies:[],logs:[],vaccines:[],reports:[],loading:true};
+
+async function loadAdminData(){
+  _adminData.loading=true;
+  renderAdminIfActive();
+  try{
+    const [profiles,babies,logs,vaccines,reports]=await Promise.all([
+      sb.adminGetProfiles(),
+      sb.adminGetBabies(),
+      sb.adminGetLogs(),
+      sb.adminGetVaccines(),
+      sb.adminGetReports()
+    ]);
+    _adminData={profiles:profiles||[],babies:babies||[],logs:logs||[],vaccines:vaccines||[],reports:reports||[],loading:false};
+  }catch(e){
+    _adminData.loading=false;
+  }
+  renderAdminIfActive();
+}
+
+async function showBugReportModal(){
+  const overlay=document.createElement("div");
+  overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center";
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 20px 40px;width:100%;max-width:480px;box-sizing:border-box">
+      <div style="font-size:17px;font-weight:800;color:#3D2B1F;margin-bottom:6px;text-align:center">דיווח על תקלה</div>
+      <div style="font-size:13px;color:#B09890;text-align:center;margin-bottom:16px">תאר את הבעיה ונטפל בה בהקדם</div>
+      <textarea id="bug-text" placeholder="מה לא עובד?" rows="5" style="width:100%;padding:14px;border-radius:14px;border:2px solid #FFDBC1;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;resize:none;background:#FFF9F5;color:#3D2B1F"></textarea>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button id="bug-cancel" style="flex:1;background:#F5F0F0;color:#8B6F63;border:none;border-radius:14px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer">ביטול</button>
+        <button id="bug-send" style="flex:2;background:linear-gradient(135deg,#FF9F66,#F07840);color:#fff;border:none;border-radius:14px;padding:14px 0;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer">שלח דיווח</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("bug-cancel").onclick=()=>overlay.remove();
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  document.getElementById("bug-send").onclick=async()=>{
+    const msg=document.getElementById("bug-text").value.trim();
+    if(!msg)return;
+    document.getElementById("bug-send").textContent="שולח...";
+    document.getElementById("bug-send").disabled=true;
+    try{
+      await sb.submitReport(msg);
+      overlay.remove();
+      btConfirm("הדיווח נשלח בהצלחה! נטפל בהקדם.","סגור",()=>{},false);
+    }catch(e){
+      document.getElementById("bug-send").textContent="שלח דיווח";
+      document.getElementById("bug-send").disabled=false;
+    }
+  };
+}
+
+function renderAdminIfActive(){
+  if(state.screen==="admin"){
+    const app=document.getElementById("app-inner");
+    if(app)app.innerHTML=renderAdmin();
+    attachAdminEvents();
+  }
+}
+
+function renderAdmin(){
+  if(!isAdmin())return"";
+  const{profiles,babies,logs,vaccines,loading}=_adminData;
+
+  const weekAgo=new Date(Date.now()-7*24*3600*1000).toISOString();
+  const newUsersWeek=profiles.filter(p=>p.created_at>weekAgo).length;
+  const babiesByUser={};
+  babies.forEach(b=>{if(b.user_id)babiesByUser[b.user_id]=(babiesByUser[b.user_id]||0)+1;});
+  const logsByBaby={};
+  logs.forEach(l=>{if(l.baby_id)logsByBaby[l.baby_id]=(logsByBaby[l.baby_id]||0)+1;});
+  const vaccByBaby={};
+  vaccines.forEach(v=>{if(v.baby_id)vaccByBaby[v.baby_id]=(vaccByBaby[v.baby_id]||0)+1;});
+
+  const statCard=(label,value,color)=>`
+    <div style="flex:1;min-width:0;background:#fff;border-radius:16px;padding:16px 12px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1.5px solid #F0E8E2">
+      <div style="font-size:26px;font-weight:900;color:${color}">${loading?"…":value}</div>
+      <div style="font-size:11px;color:#B09890;font-weight:700;margin-top:4px">${label}</div>
+    </div>`;
+
+  const userRows=profiles.map(p=>{
+    const bCount=babiesByUser[p.id]||0;
+    const userBabies=babies.filter(b=>b.user_id===p.id);
+    const logCount=userBabies.reduce((s,b)=>s+(logsByBaby[b.id]||0),0);
+    const joined=p.created_at?new Date(p.created_at).toLocaleDateString("he-IL"):"—";
+    const lastSeen=p.last_seen?new Date(p.last_seen).toLocaleDateString("he-IL"):"—";
+    const isNew=p.created_at>weekAgo;
+    return`
+    <div style="background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.05);border:1.5px solid ${isNew?"#FFDBC1":"#F0E8E2"}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#FF9F66,#F07840);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff">${(p.email||"?")[0].toUpperCase()}</div>
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#3D2B1F;word-break:break-all">${p.email||"—"}</div>
+            <div style="font-size:11px;color:#B09890">הצטרף: ${joined}</div>
+          </div>
+        </div>
+        ${isNew?`<span style="background:#FFF0E6;color:#F07840;font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;border:1px solid #FFDBC1">חדש</span>`:""}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="background:#F5F0FF;color:#7B5EA7;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px">👶 ${bCount} תינוק${bCount!==1?"ות":""}</span>
+        <span style="background:#F0F9F5;color:#2D8A60;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px">📝 ${logCount} לוגים</span>
+        <span style="background:#FFF9F0;color:#B07A20;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px">👁 ${lastSeen}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  return`
+  <div style="min-height:100vh;background:linear-gradient(170deg,#EDE8F5 0%,#F8F5FF 50%,#FFF9F5 100%);display:flex;flex-direction:column;padding-bottom:24px">
+    <div style="background:linear-gradient(135deg,#7B5EA7,#5C3D8F);padding:52px 20px 24px;position:relative">
+      <button onclick="setState({screen:'selector'})" style="position:absolute;top:52px;right:20px;background:rgba(255,255,255,0.2);border:none;border-radius:10px;padding:8px 12px;color:#fff;font-family:'Nunito',sans-serif;font-weight:700;font-size:13px;cursor:pointer">→ חזרה</button>
+      <div style="font-size:22px;font-weight:900;color:#fff;font-family:'Quicksand',sans-serif">⚙️ דשבורד מנהל</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px">בזמן אמת · ${new Date().toLocaleTimeString("he-IL")}</div>
+    </div>
+
+    <div style="padding:16px 16px 0">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        ${statCard("משתמשים",profiles.length,"#7B5EA7")}
+        ${statCard("תינוקות",babies.length,"#FF9F66")}
+        ${statCard("לוגים",logs.length,"#2D8A60")}
+        ${statCard("חיסונים",vaccines.length,"#E05A8A")}
+      </div>
+      <div style="background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05);border:1.5px solid #E8E0F5;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:800;color:#3D2B1F">משתמשים חדשים השבוע</div>
+          <div style="font-size:11px;color:#B09890">7 ימים אחרונים</div>
+        </div>
+        <div style="font-size:28px;font-weight:900;color:#7B5EA7">${loading?"…":newUsersWeek}</div>
+      </div>
+
+      <div style="font-size:13px;font-weight:800;color:#3D2B1F;margin-bottom:10px">רשימת משתמשים (${profiles.length})</div>
+      ${loading?`<div style="text-align:center;padding:40px;color:#B09890">טוען נתונים...</div>`:userRows||`<div style="text-align:center;padding:40px;color:#B09890">אין משתמשים עדיין</div>`}
+
+      <div style="font-size:13px;font-weight:800;color:#3D2B1F;margin:16px 0 10px">דיווחי תקלות (${(_adminData.reports||[]).length})</div>
+      ${loading?`<div style="text-align:center;padding:20px;color:#B09890">טוען...</div>`:
+        (_adminData.reports||[]).length===0
+        ?`<div style="background:#fff;border-radius:14px;padding:20px;text-align:center;color:#B09890;font-size:13px;border:1.5px solid #F0E8E2">אין דיווחים עדיין</div>`
+        :(_adminData.reports||[]).map(r=>{
+          const date=r.created_at?new Date(r.created_at).toLocaleString("he-IL"):"—";
+          return`<div style="background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:8px;border:1.5px solid #FFE0D0;box-shadow:0 2px 6px rgba(0,0,0,0.04)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:12px;font-weight:700;color:#F07840">${r.email||"אנונימי"}</span>
+              <span style="font-size:11px;color:#B09890">${date}</span>
+            </div>
+            <div style="font-size:13px;color:#3D2B1F;line-height:1.5;direction:rtl">${r.message}</div>
+          </div>`;
+        }).join("")
+      }
+
+      <button id="admin-refresh-btn" style="width:100%;background:linear-gradient(135deg,#7B5EA7,#5C3D8F);color:#fff;border:none;border-radius:14px;padding:14px 0;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin-top:8px">
+        🔄 רענן נתונים
+      </button>
+    </div>
+  </div>`;
+}
+
+function attachAdminEvents(){
+  document.getElementById("admin-refresh-btn")?.addEventListener("click",loadAdminData);
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
   const app=document.getElementById("app-inner");
   if(state.screen==="loading"){app.innerHTML=renderLoading();return;}
   if(state.screen==="login"){app.innerHTML=renderLogin();return;}
+  if(state.screen==="admin"){app.innerHTML=renderAdmin();attachAdminEvents();if(_adminData.loading||!_adminData.profiles.length)loadAdminData();return;}
   if(state.screen==="selector")app.innerHTML=renderSelector();
   else app.innerHTML=renderDashboard();
   attachEvents();
@@ -730,10 +902,22 @@ function renderSelector(){
       <button onclick="signOut()" style="flex:1;background:rgba(255,255,255,0.85);color:#8B6F63;border:2px solid #E8D5CC;border-radius:14px;padding:12px 0;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent">
         יציאה
       </button>
+    </div>
+    ${isAdmin()?`
+    <div style="padding:8px 20px 0;animation:selector-fade 0.5s ease both;animation-delay:0.55s">
+      <button onclick="setState({screen:'admin'})" style="width:100%;background:linear-gradient(135deg,#7B5EA7,#5C3D8F);color:#fff;border:none;border-radius:14px;padding:12px 0;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 10px rgba(92,61,143,0.35);-webkit-tap-highlight-color:transparent">
+        ⚙️ דשבורד מנהל
+      </button>
     </div>`:""}
+    `:""}
+
+    <!-- Bug report button -->
+    <div style="padding:8px 20px 0;text-align:center">
+      <button onclick="showBugReportModal()" style="background:none;border:none;cursor:pointer;font-size:12px;color:#B09890;font-family:'Nunito',sans-serif;font-weight:600;text-decoration:underline;-webkit-tap-highlight-color:transparent">דיווח על תקלה</button>
+    </div>
 
     <!-- Bottom security bar -->
-    <div style="margin:12px 20px 0;background:rgba(255,255,255,0.7);backdrop-filter:blur(10px);border-radius:20px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border:1.5px solid rgba(255,219,193,0.4);box-shadow:0 2px 12px rgba(200,149,108,0.1);animation:selector-fade 0.5s ease both;animation-delay:0.6s">
+    <div style="margin:8px 20px 0;background:rgba(255,255,255,0.7);backdrop-filter:blur(10px);border-radius:20px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border:1.5px solid rgba(255,219,193,0.4);box-shadow:0 2px 12px rgba(200,149,108,0.1);animation:selector-fade 0.5s ease both;animation-delay:0.6s">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:34px;height:34px;border-radius:10px;background:#FFF0E6;border:1.5px solid #FFDBC1;display:flex;align-items:center;justify-content:center">
           <span style="font-size:16px">🛡️</span>
