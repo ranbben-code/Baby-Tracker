@@ -124,16 +124,21 @@ input,textarea{font-family:'Varela Round','Quicksand',sans-serif}
 </head>
 <body>
 <div id="app"><div id="app-inner"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 // ── Supabase ───────────────────────────────────────────────────────────────
 const SB_URL="https://xndmzuasewpotpphlecx.supabase.co";
 const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuZG16dWFzZXdwb3RwcGhsZWN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MDY3MTEsImV4cCI6MjA5NDk4MjcxMX0.JsSzL3vOduGsuoQr9t7YcNGLVlyRTG1XGgr32IbI4vo";
 
+const sbClient=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,storageKey:"bt_auth_session"}});
+let _authToken=SB_KEY;
+let _currentUser=null;
+
 async function sbFetch(path,opts={}){
   const res=await fetch(SB_URL+"/rest/v1/"+path,{
     headers:{
       "apikey":SB_KEY,
-      "Authorization":"Bearer "+SB_KEY,
+      "Authorization":"Bearer "+_authToken,
       "Content-Type":"application/json",
       "Prefer":opts.prefer||"return=representation",
       ...(opts.headers||{})
@@ -172,7 +177,8 @@ function logToRow(l,babyId){
     med_name:l.medName||null,
     med_dose:l.medDose||null,
     note:l.note||null,
-    ml_by_type:l.mlByType||null
+    ml_by_type:l.mlByType||null,
+    user_id:_currentUser?.id||null
   };
 }
 function rowToLog(r){
@@ -191,7 +197,7 @@ function rowToLog(r){
   };
 }
 function babyToRow(b){
-  return{id:String(b.id),name:b.name,emoji:b.emoji,dob:b.dob||null,created_at:b.createdAt||Date.now()};
+  return{id:String(b.id),name:b.name,emoji:b.emoji,dob:b.dob||null,created_at:b.createdAt||Date.now(),user_id:_currentUser?.id||null};
 }
 function rowToBaby(r){
   return{id:r.id,name:r.name,emoji:r.emoji,dob:r.dob,createdAt:r.created_at,photoData:getBabyPhoto(r.id)};
@@ -440,12 +446,75 @@ function setState(patch){Object.assign(state,patch);render();}
 
 function setSyncStatus(s){state.syncStatus=s;const d=document.getElementById("sync-dot");if(d){d.className="sync-dot "+s;}}
 
+// ── Auth ────────────────────────────────────────────────────────────────────
+async function signInWithGoogle(){
+  await sbClient.auth.signInWithOAuth({
+    provider:"google",
+    options:{redirectTo:window.location.href.split("#")[0]}
+  });
+}
+
+async function signOut(){
+  await sbClient.auth.signOut();
+  _authToken=SB_KEY;_currentUser=null;
+  setState({screen:"login",babies:[],selectedBaby:null,logs:[]});
+}
+
+async function generateInvite(){
+  if(!_currentUser)return;
+  const code=Math.random().toString(36).substring(2,8).toUpperCase();
+  const expires=new Date(Date.now()+24*3600*1000).toISOString();
+  try{
+    await sbFetch("invites",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",body:JSON.stringify({code,owner_user_id:_currentUser.id,expires_at:expires})});
+    btConfirm(`קוד ההזמנה שלך:\n\n${code}\n\nשלח אותו להורה השני. תקף ל-24 שעות.`,"סגור",()=>{},false);
+  }catch(e){btConfirm("שגיאה ביצירת קוד הזמנה","סגור",()=>{},false);}
+}
+
+async function joinWithCode(){
+  const code=document.getElementById("invite-code-input")?.value?.trim().toUpperCase();
+  const msg=document.getElementById("invite-msg");
+  if(!code||code.length!==6){if(msg)msg.innerHTML='<span style="color:#F06292">יש להזין קוד בן 6 תווים</span>';return;}
+  if(msg)msg.innerHTML='<span style="color:#FF9F66">בודק קוד...</span>';
+  // First sign in with Google, then link to the invite owner
+  localStorage.setItem("bt_pending_invite",code);
+  await sbClient.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.href.split("#")[0]}});
+}
+
+async function processPendingInvite(userId){
+  const code=localStorage.getItem("bt_pending_invite");
+  if(!code)return;
+  localStorage.removeItem("bt_pending_invite");
+  try{
+    // בדוק שהקוד קיים ולא פג תוקף
+    const rows=await sbFetch(`invites?code=eq.${code}&expires_at=gte.${new Date().toISOString()}&select=owner_user_id`);
+    if(!rows||rows.length===0)return;
+    const ownerId=rows[0].owner_user_id;
+    if(ownerId===userId)return; // אותו משתמש
+    // צור רשומת shared_access
+    await sbFetch("shared_access",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",body:JSON.stringify({user_id:userId,owner_user_id:ownerId})});
+  }catch(e){console.warn("invite error:",e);}
+}
+
+async function migrateUnownedData(userId){
+  try{
+    await sbFetch("babies?user_id=is.null",{method:"PATCH",prefer:"return=minimal",body:JSON.stringify({user_id:userId})});
+    await sbFetch("logs?user_id=is.null",{method:"PATCH",prefer:"return=minimal",body:JSON.stringify({user_id:userId})});
+    await sbFetch("vaccines?user_id=is.null",{method:"PATCH",prefer:"return=minimal",body:JSON.stringify({user_id:userId})});
+  }catch(e){console.warn("migration:",e);}
+}
+
 // ── Init: load from Supabase ───────────────────────────────────────────────
 async function init(){
   setState({screen:"loading"});
+  const{data:{session}}=await sbClient.auth.getSession();
+  if(!session){setState({screen:"login"});return;}
+  _authToken=session.access_token;
+  _currentUser=session.user;
+  await processPendingInvite(session.user.id);
+  await migrateUnownedData(session.user.id);
   const [result]=await Promise.allSettled([
     sb.getBabies(),
-    new Promise(r=>setTimeout(r,3000))
+    new Promise(r=>setTimeout(r,1500))
   ]);
   if(result.status==="fulfilled"){
     const babies=result.value.map(rowToBaby);
@@ -457,10 +526,56 @@ async function init(){
   }
 }
 
+// ── Login Screen ────────────────────────────────────────────────────────────
+function renderLogin(){
+  return`
+  <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(160deg,#FFF9F5 0%,#FFE8D6 100%);padding:32px 24px;box-sizing:border-box">
+    <div style="width:90px;height:90px;border-radius:22px;background:linear-gradient(135deg,#FFB47A,#F07232);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(240,114,50,0.35);margin-bottom:24px">
+      <svg width="48" height="48" viewBox="0 0 100 100" fill="none">
+        <rect x="40" y="15" width="20" height="11" rx="5.5" fill="rgba(255,255,255,0.88)"/>
+        <rect x="29" y="25" width="42" height="9" rx="4.5" fill="rgba(255,255,255,0.92)"/>
+        <rect x="23" y="33" width="54" height="52" rx="15" fill="white"/>
+        <rect x="32" y="53" width="36" height="6" rx="3" fill="rgba(255,159,102,0.32)"/>
+        <rect x="35" y="64" width="30" height="5" rx="2.5" fill="rgba(255,159,102,0.22)"/>
+      </svg>
+    </div>
+    <div style="font-family:'Quicksand',sans-serif;font-size:28px;font-weight:800;color:#3D2B1F;margin-bottom:8px;text-align:center">Baby Tracker</div>
+    <div style="font-size:15px;color:#8B6F63;margin-bottom:48px;text-align:center">עקוב אחר התינוק שלך בקלות</div>
+    <button onclick="signInWithGoogle()"
+      style="width:100%;max-width:320px;background:#fff;border:2px solid #E8D5CC;border-radius:16px;padding:16px 20px;display:flex;align-items:center;justify-content:center;gap:14px;cursor:pointer;font-family:'Nunito',sans-serif;font-size:16px;font-weight:700;color:#3D2B1F;box-shadow:0 4px 16px rgba(0,0,0,0.08);transition:box-shadow 0.2s"
+      onmouseover="this.style.boxShadow='0 6px 24px rgba(0,0,0,0.14)'"
+      onmouseout="this.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'">
+      <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      התחבר עם Google
+    </button>
+    <div style="margin-top:20px;width:100%;max-width:320px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;height:1px;background:#E8D5CC"></div>
+      <span style="font-size:12px;color:#B09890;white-space:nowrap">או</span>
+      <div style="flex:1;height:1px;background:#E8D5CC"></div>
+    </div>
+
+    <div style="margin-top:16px;width:100%;max-width:320px" id="invite-section">
+      <div style="display:flex;gap:8px">
+        <input id="invite-code-input" type="text" placeholder="קוד הזמנה - 6 ספרות" maxlength="6"
+          style="flex:1;padding:14px 16px;border-radius:14px;border:2px solid #E8D5CC;font-size:15px;font-family:inherit;box-sizing:border-box;direction:rtl;outline:none;background:#fff;color:#3D2B1F;letter-spacing:2px;text-align:center;min-width:0"
+          oninput="this.value=this.value.toUpperCase()"/>
+        <button onclick="joinWithCode()"
+          style="background:linear-gradient(135deg,#FF9F66,#F07840);color:#fff;border:none;border-radius:14px;padding:14px 18px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(255,159,102,0.35)">
+          הצטרף
+        </button>
+      </div>
+      <div id="invite-msg" style="font-size:12px;text-align:center;margin-top:8px;min-height:16px"></div>
+    </div>
+
+    <div style="margin-top:24px;font-size:12px;color:#B09890;text-align:center;max-width:280px;line-height:1.6">הנתונים שלך מאובטחים ומוצפנים.<br>לא נשתף את המידע שלך עם אף גורם.</div>
+  </div>`;
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
   const app=document.getElementById("app-inner");
   if(state.screen==="loading"){app.innerHTML=renderLoading();return;}
+  if(state.screen==="login"){app.innerHTML=renderLogin();return;}
   if(state.screen==="selector")app.innerHTML=renderSelector();
   else app.innerHTML=renderDashboard();
   attachEvents();
@@ -543,8 +658,13 @@ function renderSelector(){
     <div style="position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(127,192,156,0.12) 0%,transparent 70%);bottom:100px;right:-40px;pointer-events:none"></div>
 
     <!-- Top brand text -->
-    <div style="text-align:center;padding-top:56px;margin-bottom:28px;animation:selector-fade 0.5s ease both">
+    <div style="text-align:center;padding-top:56px;margin-bottom:28px;animation:selector-fade 0.5s ease both;position:relative">
       <div style="font-size:36px;font-weight:900;color:#FF9F66;font-family:'Quicksand',sans-serif;letter-spacing:-1px;line-height:1">Baby-Tracker</div>
+      ${_currentUser?`<div style="font-size:11px;color:#B09890;margin-top:6px">${_currentUser.email}</div>
+      <div style="position:absolute;top:0;left:20px;display:flex;gap:8px">
+        <button onclick="generateInvite()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#FF9F66;font-family:'Nunito',sans-serif;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid #FFDBC1">🔗 שתף</button>
+        <button onclick="signOut()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#B09890;font-family:'Nunito',sans-serif;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid #E8D5CC">יציאה</button>
+      </div>`:""}
     </div>
 
     <!-- Welcome text -->
@@ -2234,3 +2354,4 @@ if("serviceWorker" in navigator){
 </script>
 </body>
 </html>
+
