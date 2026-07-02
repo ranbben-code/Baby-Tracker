@@ -660,11 +660,7 @@ function renderSelector(){
     <!-- Top brand text -->
     <div style="text-align:center;padding-top:56px;margin-bottom:28px;animation:selector-fade 0.5s ease both;position:relative">
       <div style="font-size:36px;font-weight:900;color:#FF9F66;font-family:'Quicksand',sans-serif;letter-spacing:-1px;line-height:1">Baby-Tracker</div>
-      ${_currentUser?`<div style="font-size:11px;color:#B09890;margin-top:6px">${_currentUser.email}</div>
-      <div style="position:absolute;top:0;left:20px;display:flex;gap:8px">
-        <button onclick="generateInvite()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#FF9F66;font-family:'Nunito',sans-serif;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid #FFDBC1">🔗 שתף</button>
-        <button onclick="signOut()" style="background:none;border:none;cursor:pointer;font-size:11px;color:#B09890;font-family:'Nunito',sans-serif;font-weight:700;padding:4px 8px;border-radius:8px;border:1px solid #E8D5CC">יציאה</button>
-      </div>`:""}
+      ${_currentUser?`<div style="font-size:11px;color:#B09890;margin-top:6px">${_currentUser.email}</div>`:""}
     </div>
 
     <!-- Welcome text -->
@@ -737,6 +733,17 @@ function renderSelector(){
         ${svgIcon(ICONS.refresh,16,"#FF9F66")}
       </button>
     </div>
+
+    ${_currentUser?`
+    <!-- Share + Sign out buttons -->
+    <div style="display:flex;gap:12px;padding:16px 20px 8px;animation:selector-fade 0.5s ease both;animation-delay:0.5s">
+      <button onclick="generateInvite()" style="flex:1;background:linear-gradient(135deg,#FF9F66,#F07840);color:#fff;border:none;border-radius:16px;padding:15px 0;font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 4px 14px rgba(255,159,102,0.4);-webkit-tap-highlight-color:transparent">
+        🔗 שתף גישה
+      </button>
+      <button onclick="signOut()" style="flex:1;background:rgba(255,255,255,0.85);color:#8B6F63;border:2px solid #E8D5CC;border-radius:16px;padding:15px 0;font-family:'Nunito',sans-serif;font-weight:800;font-size:16px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+        יציאה
+      </button>
+    </div>`:""}
   </div>`;
 }
 
